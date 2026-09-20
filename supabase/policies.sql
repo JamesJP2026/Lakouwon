@@ -7,6 +7,10 @@
 -- dérivés de `employes.permissions` (le même référentiel de clés
 -- de modules que l'application), et non plus vérifiés seulement
 -- côté client.
+--
+-- Ce fichier est rejouable sans erreur (chaque policy/trigger est
+-- supprimé avant d'être recréé) : vous pouvez le ré-exécuter en
+-- entier si besoin, par exemple après une modification.
 -- =========================================================
 
 -- ---------------------------------------------------------
@@ -49,16 +53,22 @@ $$;
 -- SETTINGS
 -- ---------------------------------------------------------
 alter table settings enable row level security;
+drop policy if exists settings_select on settings;
 create policy settings_select on settings for select using (is_active_employe());
+drop policy if exists settings_update on settings;
 create policy settings_update on settings for update using (has_perm('parametres')) with check (has_perm('parametres'));
 
 -- ---------------------------------------------------------
 -- MAGASINS
 -- ---------------------------------------------------------
 alter table magasins enable row level security;
+drop policy if exists magasins_select on magasins;
 create policy magasins_select on magasins for select using (is_active_employe());
+drop policy if exists magasins_insert on magasins;
 create policy magasins_insert on magasins for insert with check (has_perm('parametres'));
+drop policy if exists magasins_update on magasins;
 create policy magasins_update on magasins for update using (has_perm('parametres')) with check (has_perm('parametres'));
+drop policy if exists magasins_delete on magasins;
 create policy magasins_delete on magasins for delete using (has_perm('parametres'));
 
 -- ---------------------------------------------------------
@@ -71,9 +81,13 @@ create policy magasins_delete on magasins for delete using (has_perm('parametres
 -- policy RLS directe.
 -- ---------------------------------------------------------
 alter table employes enable row level security;
+drop policy if exists employes_select on employes;
 create policy employes_select on employes for select using (is_active_employe());
+drop policy if exists employes_insert on employes;
 create policy employes_insert on employes for insert with check (has_perm('employes'));
+drop policy if exists employes_update on employes;
 create policy employes_update on employes for update using (has_perm('employes')) with check (has_perm('employes'));
+drop policy if exists employes_delete on employes;
 create policy employes_delete on employes for delete using (has_perm('employes'));
 
 -- Seul un Admin peut promouvoir un employé au rôle Admin, même
@@ -87,6 +101,7 @@ begin
   return new;
 end;
 $$;
+drop trigger if exists trg_employes_admin_promotion on employes;
 create trigger trg_employes_admin_promotion
   before insert or update on employes
   for each row execute function enforce_admin_role_promotion();
@@ -95,18 +110,26 @@ create trigger trg_employes_admin_promotion
 -- PRODUITS
 -- ---------------------------------------------------------
 alter table produits enable row level security;
+drop policy if exists produits_select on produits;
 create policy produits_select on produits for select using (is_active_employe());
+drop policy if exists produits_insert on produits;
 create policy produits_insert on produits for insert with check (has_perm('produits'));
+drop policy if exists produits_update on produits;
 create policy produits_update on produits for update using (has_perm('produits')) with check (has_perm('produits'));
+drop policy if exists produits_delete on produits;
 create policy produits_delete on produits for delete using (has_perm('produits'));
 
 -- ---------------------------------------------------------
 -- CLIENTS
 -- ---------------------------------------------------------
 alter table clients enable row level security;
+drop policy if exists clients_select on clients;
 create policy clients_select on clients for select using (is_active_employe());
+drop policy if exists clients_insert on clients;
 create policy clients_insert on clients for insert with check (has_perm('clients') or has_perm('vente'));
+drop policy if exists clients_update on clients;
 create policy clients_update on clients for update using (has_perm('clients')) with check (has_perm('clients'));
+drop policy if exists clients_delete on clients;
 create policy clients_delete on clients for delete using (has_perm('clients'));
 
 -- ---------------------------------------------------------
@@ -122,11 +145,15 @@ create policy clients_delete on clients for delete using (has_perm('clients'));
 -- La suppression est réservée à l'Admin.
 -- ---------------------------------------------------------
 alter table ventes enable row level security;
+drop policy if exists ventes_select on ventes;
 create policy ventes_select on ventes for select using (is_active_employe());
+drop policy if exists ventes_insert on ventes;
 create policy ventes_insert on ventes for insert with check (has_perm('vente'));
+drop policy if exists ventes_update on ventes;
 create policy ventes_update on ventes for update
   using (has_perm('vente') or has_perm('fiches') or has_perm('clients') or has_perm('caisse'))
   with check (has_perm('vente') or has_perm('fiches') or has_perm('clients') or has_perm('caisse'));
+drop policy if exists ventes_delete on ventes;
 create policy ventes_delete on ventes for delete using (is_admin());
 
 create or replace function enforce_vente_update_admin_only()
@@ -151,6 +178,7 @@ begin
   return new;
 end;
 $$;
+drop trigger if exists trg_ventes_update_admin_only on ventes;
 create trigger trg_ventes_update_admin_only
   before update on ventes
   for each row execute function enforce_vente_update_admin_only();
@@ -161,9 +189,13 @@ create trigger trg_ventes_update_admin_only
 -- réservée à 'proforma'.
 -- ---------------------------------------------------------
 alter table proformas enable row level security;
+drop policy if exists proformas_select on proformas;
 create policy proformas_select on proformas for select using (is_active_employe());
+drop policy if exists proformas_insert on proformas;
 create policy proformas_insert on proformas for insert with check (has_perm('proforma'));
+drop policy if exists proformas_update on proformas;
 create policy proformas_update on proformas for update using (has_perm('proforma')) with check (has_perm('proforma'));
+drop policy if exists proformas_delete on proformas;
 create policy proformas_delete on proformas for delete using (has_perm('proforma'));
 
 -- ---------------------------------------------------------
@@ -171,15 +203,20 @@ create policy proformas_delete on proformas for delete using (has_perm('proforma
 -- Passe par rpc_execute_transfert(); pas d'update/delete côté app.
 -- ---------------------------------------------------------
 alter table transferts enable row level security;
+drop policy if exists transferts_select on transferts;
 create policy transferts_select on transferts for select using (has_perm('transferts'));
+drop policy if exists transferts_insert on transferts;
 create policy transferts_insert on transferts for insert with check (has_perm('transferts'));
 
 -- ---------------------------------------------------------
 -- ACHATS
 -- ---------------------------------------------------------
 alter table achats enable row level security;
+drop policy if exists achats_select on achats;
 create policy achats_select on achats for select using (has_perm('achats'));
+drop policy if exists achats_insert on achats;
 create policy achats_insert on achats for insert with check (has_perm('achats'));
+drop policy if exists achats_delete on achats;
 create policy achats_delete on achats for delete using (has_perm('achats'));
 
 -- ---------------------------------------------------------
@@ -190,14 +227,18 @@ create policy achats_delete on achats for delete using (has_perm('achats'));
 -- les fonctions RPC elles-mêmes (security definer).
 -- ---------------------------------------------------------
 alter table caisse_movements enable row level security;
+drop policy if exists caisse_select on caisse_movements;
 create policy caisse_select on caisse_movements for select using (is_active_employe());
+drop policy if exists caisse_insert on caisse_movements;
 create policy caisse_insert on caisse_movements for insert with check (has_perm('caisse'));
 
 -- ---------------------------------------------------------
 -- PAYROLL PAIEMENTS
 -- ---------------------------------------------------------
 alter table payroll_paiements enable row level security;
+drop policy if exists payroll_select on payroll_paiements;
 create policy payroll_select on payroll_paiements for select using (has_perm('employes'));
+drop policy if exists payroll_insert on payroll_paiements;
 create policy payroll_insert on payroll_paiements for insert with check (has_perm('employes'));
 
 -- ---------------------------------------------------------
@@ -207,7 +248,9 @@ create policy payroll_insert on payroll_paiements for insert with check (has_per
 -- consultation du journal complet requiert la permission dédiée.
 -- ---------------------------------------------------------
 alter table journal enable row level security;
+drop policy if exists journal_select on journal;
 create policy journal_select on journal for select using (has_perm('journal'));
+drop policy if exists journal_insert on journal;
 create policy journal_insert on journal for insert with check (is_active_employe());
 
 -- ---------------------------------------------------------
