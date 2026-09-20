@@ -33,9 +33,13 @@ legacy/
 ```
 
 Aucune étape de build : `index.html` charge `src/js/app.js` via
-`<script type="module">`, qui importe `@supabase/supabase-js` depuis
-un CDN (`esm.sh`). Le dossier peut être servi tel quel par n'importe
-quel hébergeur de fichiers statiques.
+`<script type="module">`, qui importe le client Supabase depuis une
+copie locale déjà empaquetée (`src/js/vendor/supabase.esm.js`) plutôt
+que depuis un CDN — l'app n'a donc aucune dépendance réseau externe
+au chargement (un blocage d'un CDN par un pare-feu, un bloqueur de
+pub ou un réseau restrictif ne peut plus provoquer de page blanche).
+Le dossier peut être servi tel quel par n'importe quel hébergeur de
+fichiers statiques.
 
 ## 2. Pourquoi des fonctions RPC en plus de la base de données ?
 

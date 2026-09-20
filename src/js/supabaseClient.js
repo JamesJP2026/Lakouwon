@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "./vendor/supabase.esm.js";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../config.js";
 
 if (!SUPABASE_URL || SUPABASE_URL.includes("VOTRE-PROJET")) {
