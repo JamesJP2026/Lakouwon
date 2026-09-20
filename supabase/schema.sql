@@ -209,10 +209,28 @@ create index if not exists idx_journal_date on journal(date desc);
 
 -- ---------------------------------------------------------
 -- Activer Realtime sur les tables qui doivent se synchroniser
--- instantanément entre postes (à activer aussi dans le
--- Dashboard Supabase > Database > Replication si nécessaire).
+-- instantanément entre postes. Idempotent : sur beaucoup de
+-- projets Supabase récents, la publication `supabase_realtime`
+-- couvre déjà toutes les tables par défaut, ce qui ferait échouer
+-- un simple `alter publication ... add table` (ré)exécuté à la
+-- main. On ajoute donc chaque table une par une, en sautant
+-- celles déjà membres.
 -- ---------------------------------------------------------
-alter publication supabase_realtime add table
-  settings, magasins, employes, produits, clients, ventes,
-  proformas, transferts, achats, caisse_movements,
-  payroll_paiements, journal;
+do $$
+declare
+  t text;
+begin
+  foreach t in array array[
+    'settings','magasins','employes','produits','clients','ventes',
+    'proformas','transferts','achats','caisse_movements',
+    'payroll_paiements','journal'
+  ]
+  loop
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
