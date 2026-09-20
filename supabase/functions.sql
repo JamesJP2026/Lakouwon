@@ -1,0 +1,581 @@
+-- =========================================================
+-- Lakouwon POS — Fonctions RPC (transactions atomiques)
+-- À exécuter après schema.sql et policies.sql
+-- =========================================================
+-- Pourquoi des RPC et pas seulement des requêtes directes du
+-- client ? Deux magasins et plusieurs employés peuvent agir en
+-- même temps sur le même stock. Un simple "lire le stock côté
+-- client puis réécrire" (comme dans l'ancienne version
+-- localStorage) provoquerait des ventes en double sur un stock
+-- déjà épuisé. Chaque opération sensible est donc encapsulée
+-- dans une fonction SQL qui verrouille les lignes concernées
+-- (`for update`) et vérifie/déduit le stock de façon atomique,
+-- dans une seule transaction. Les prix et coûts sont recalculés
+-- ici à partir de la table `produits`, jamais acceptés tels quels
+-- depuis le client, pour empêcher une falsification des prix.
+-- =========================================================
+
+-- ---------------------------------------------------------
+-- rpc_finalize_sale — encaissement d'une nouvelle vente
+-- p_items: [{"produit_id":"uuid","mode":"detail"|"gros","lot_id":"uuid|null","qte":n}]
+-- ---------------------------------------------------------
+create or replace function rpc_finalize_sale(
+  p_magasin_id uuid,
+  p_items jsonb,
+  p_remise_type text,
+  p_remise_valeur numeric,
+  p_mode_paiement text,
+  p_montant_recu numeric,
+  p_encaissement_partiel boolean,
+  p_client_id uuid
+) returns ventes
+language plpgsql security definer set search_path = public as $$
+declare
+  v_employe employes;
+  v_item jsonb;
+  v_produit produits;
+  v_lot jsonb;
+  v_qte int;
+  v_unite_par_lot int;
+  v_prix_vente numeric;
+  v_cout_unitaire numeric;
+  v_nom text;
+  v_units_needed int;
+  v_stock_total int;
+  v_caisses_needed int;
+  v_reste_u int;
+  v_total_brut numeric := 0;
+  v_cout_total numeric := 0;
+  v_remise numeric := 0;
+  v_total numeric := 0;
+  v_reste numeric := 0;
+  v_montant_paye numeric := 0;
+  v_monnaie numeric := 0;
+  v_mode_final text;
+  v_numero text;
+  v_vente_id uuid;
+  v_items_out jsonb := '[]'::jsonb;
+  v_produit_id uuid;
+begin
+  v_employe := current_employe_row();
+  if v_employe.id is null then raise exception 'Employé non authentifié ou inactif'; end if;
+  if not has_perm('vente') then raise exception 'Permission refusée : vente'; end if;
+  if p_items is null or jsonb_array_length(p_items) = 0 then raise exception 'Le panier est vide'; end if;
+
+  for v_item in select * from jsonb_array_elements(p_items) loop
+    v_produit_id := (v_item->>'produit_id')::uuid;
+    v_qte := greatest(1, (v_item->>'qte')::int);
+    select * into v_produit from produits where id = v_produit_id and magasin_id = p_magasin_id for update;
+    if not found then raise exception 'Produit introuvable'; end if;
+
+    if (v_item->>'mode') = 'gros' then
+      select l into v_lot from jsonb_array_elements(v_produit.lots) l where l->>'id' = (v_item->>'lot_id') limit 1;
+      if v_lot is null then raise exception 'Lot introuvable pour %', v_produit.nom; end if;
+      v_unite_par_lot := (v_lot->>'taille')::int;
+      v_prix_vente := (v_lot->>'prix')::numeric;
+      v_cout_unitaire := (v_produit.prix_achat / greatest(v_produit.quantite_par_caisse,1)) * v_unite_par_lot;
+      v_nom := v_produit.nom || ' — Lot de ' || v_unite_par_lot;
+    else
+      v_unite_par_lot := 1;
+      v_prix_vente := v_produit.prix_vente_detail;
+      v_cout_unitaire := v_produit.prix_achat / greatest(v_produit.quantite_par_caisse,1);
+      v_nom := v_produit.nom;
+    end if;
+
+    v_units_needed := v_qte * v_unite_par_lot;
+    v_stock_total := v_produit.quantite_caisse * v_produit.quantite_par_caisse + v_produit.quantite_detail;
+    if v_units_needed > v_stock_total then raise exception 'Stock insuffisant pour %', v_produit.nom; end if;
+
+    if v_produit.quantite_detail >= v_units_needed then
+      update produits set quantite_detail = quantite_detail - v_units_needed where id = v_produit_id;
+    else
+      v_reste_u := v_units_needed - v_produit.quantite_detail;
+      v_caisses_needed := ceil(v_reste_u::numeric / greatest(v_produit.quantite_par_caisse,1));
+      update produits set
+        quantite_caisse = quantite_caisse - v_caisses_needed,
+        quantite_detail = (v_caisses_needed * greatest(v_produit.quantite_par_caisse,1)) - v_reste_u
+      where id = v_produit_id;
+    end if;
+
+    v_total_brut := v_total_brut + (v_qte * v_prix_vente);
+    v_cout_total := v_cout_total + (v_qte * v_cout_unitaire);
+    v_items_out := v_items_out || jsonb_build_array(jsonb_build_object(
+      'produitId', v_produit_id, 'nom', v_nom, 'mode', coalesce(v_item->>'mode','detail'),
+      'qte', v_qte, 'uniteParLot', v_unite_par_lot, 'prixVente', v_prix_vente, 'coutUnitaire', v_cout_unitaire));
+  end loop;
+
+  v_remise := case when p_remise_valeur is null or p_remise_valeur <= 0 then 0
+    when p_remise_type = 'pourcentage' then greatest(0, least(v_total_brut * (p_remise_valeur/100.0), v_total_brut))
+    else greatest(0, least(p_remise_valeur, v_total_brut)) end;
+  v_total := greatest(0, v_total_brut - v_remise);
+
+  if not p_encaissement_partiel and p_montant_recu < v_total then
+    raise exception 'Montant reçu insuffisant';
+  end if;
+  if p_encaissement_partiel and p_client_id is null then
+    raise exception 'Un client est requis pour un encaissement partiel';
+  end if;
+
+  v_reste := case when p_encaissement_partiel then greatest(0, v_total - p_montant_recu) else 0 end;
+  v_montant_paye := v_total - v_reste;
+  v_monnaie := greatest(0, p_montant_recu - v_total);
+  v_mode_final := case when v_reste > 0 then 'credit' else p_mode_paiement end;
+  v_numero := 'V' || to_char(now(),'YYMMDDHH24MISS') || substr(md5(random()::text || clock_timestamp()::text),1,4);
+  v_vente_id := gen_random_uuid();
+
+  insert into ventes (id, numero, magasin_id, date, items, total_brut, remise, total, cout_total,
+    mode_paiement, montant_recu, monnaie_rendue, montant_paye, reste, client_id, employe_id, paiements)
+  values (v_vente_id, v_numero, p_magasin_id, now(), v_items_out, v_total_brut, v_remise, v_total, v_cout_total,
+    v_mode_final, p_montant_recu, v_monnaie, v_montant_paye, v_reste,
+    case when v_reste > 0 or p_client_id is not null then p_client_id else null end,
+    v_employe.id, '[]'::jsonb);
+
+  if p_mode_paiement = 'cash' then
+    if p_montant_recu > 0 then
+      insert into caisse_movements (magasin_id, date, type, montant, motif, employe_id, source, vente_id)
+      values (p_magasin_id, now(), 'entree', p_montant_recu, 'Vente ' || v_numero, v_employe.id, 'vente', v_vente_id);
+    end if;
+    if v_monnaie > 0 then
+      insert into caisse_movements (magasin_id, date, type, montant, motif, employe_id, source, vente_id)
+      values (p_magasin_id, now(), 'sortie', v_monnaie, 'Monnaie rendue — ' || v_numero, v_employe.id, 'monnaie', v_vente_id);
+    end if;
+  end if;
+
+  insert into journal (date, action, details, employe_id, magasin_id)
+  values (now(), 'Vente ' || v_numero || ' enregistrée', v_total::text || ' · ' || v_mode_final, v_employe.id, p_magasin_id);
+
+  return (select v from ventes v where v.id = v_vente_id);
+end;
+$$;
+
+-- ---------------------------------------------------------
+-- rpc_modifier_vente — Admin uniquement. Restaure le stock de
+-- l'ancienne version, retire ses mouvements de caisse, puis
+-- ré-applique la nouvelle vente sur la MÊME ligne (id/numéro
+-- conservés). L'historique de paiements partiels est réinitialisé
+-- (comme dans l'app d'origine, avec avertissement côté client).
+-- ---------------------------------------------------------
+create or replace function rpc_modifier_vente(
+  p_vente_id uuid,
+  p_items jsonb,
+  p_remise_type text,
+  p_remise_valeur numeric,
+  p_mode_paiement text,
+  p_montant_recu numeric,
+  p_encaissement_partiel boolean,
+  p_client_id uuid
+) returns ventes
+language plpgsql security definer set search_path = public as $$
+declare
+  v_employe employes;
+  v_old ventes;
+  v_old_item jsonb;
+  v_item jsonb;
+  v_produit produits;
+  v_lot jsonb;
+  v_qte int;
+  v_unite_par_lot int;
+  v_prix_vente numeric;
+  v_cout_unitaire numeric;
+  v_nom text;
+  v_units_needed int;
+  v_stock_total int;
+  v_caisses_needed int;
+  v_reste_u int;
+  v_total_brut numeric := 0;
+  v_cout_total numeric := 0;
+  v_remise numeric := 0;
+  v_total numeric := 0;
+  v_reste numeric := 0;
+  v_montant_paye numeric := 0;
+  v_monnaie numeric := 0;
+  v_mode_final text;
+  v_items_out jsonb := '[]'::jsonb;
+  v_produit_id uuid;
+begin
+  if not is_admin() then raise exception 'Seul un administrateur peut modifier une vente'; end if;
+  v_employe := current_employe_row();
+  select * into v_old from ventes where id = p_vente_id for update;
+  if not found then raise exception 'Vente introuvable'; end if;
+
+  for v_old_item in select * from jsonb_array_elements(v_old.items) loop
+    update produits set quantite_detail = quantite_detail + (
+      case when (v_old_item->>'mode') = 'gros'
+        then (v_old_item->>'qte')::int * (v_old_item->>'uniteParLot')::int
+        else (v_old_item->>'qte')::int end
+    ) where id = (v_old_item->>'produitId')::uuid;
+  end loop;
+  delete from caisse_movements where vente_id = p_vente_id;
+
+  if p_items is null or jsonb_array_length(p_items) = 0 then raise exception 'Le panier est vide'; end if;
+  for v_item in select * from jsonb_array_elements(p_items) loop
+    v_produit_id := (v_item->>'produit_id')::uuid;
+    v_qte := greatest(1, (v_item->>'qte')::int);
+    select * into v_produit from produits where id = v_produit_id and magasin_id = v_old.magasin_id for update;
+    if not found then raise exception 'Produit introuvable'; end if;
+
+    if (v_item->>'mode') = 'gros' then
+      select l into v_lot from jsonb_array_elements(v_produit.lots) l where l->>'id' = (v_item->>'lot_id') limit 1;
+      if v_lot is null then raise exception 'Lot introuvable pour %', v_produit.nom; end if;
+      v_unite_par_lot := (v_lot->>'taille')::int;
+      v_prix_vente := (v_lot->>'prix')::numeric;
+      v_cout_unitaire := (v_produit.prix_achat / greatest(v_produit.quantite_par_caisse,1)) * v_unite_par_lot;
+      v_nom := v_produit.nom || ' — Lot de ' || v_unite_par_lot;
+    else
+      v_unite_par_lot := 1;
+      v_prix_vente := v_produit.prix_vente_detail;
+      v_cout_unitaire := v_produit.prix_achat / greatest(v_produit.quantite_par_caisse,1);
+      v_nom := v_produit.nom;
+    end if;
+
+    v_units_needed := v_qte * v_unite_par_lot;
+    v_stock_total := v_produit.quantite_caisse * v_produit.quantite_par_caisse + v_produit.quantite_detail;
+    if v_units_needed > v_stock_total then raise exception 'Stock insuffisant pour %', v_produit.nom; end if;
+
+    if v_produit.quantite_detail >= v_units_needed then
+      update produits set quantite_detail = quantite_detail - v_units_needed where id = v_produit_id;
+    else
+      v_reste_u := v_units_needed - v_produit.quantite_detail;
+      v_caisses_needed := ceil(v_reste_u::numeric / greatest(v_produit.quantite_par_caisse,1));
+      update produits set
+        quantite_caisse = quantite_caisse - v_caisses_needed,
+        quantite_detail = (v_caisses_needed * greatest(v_produit.quantite_par_caisse,1)) - v_reste_u
+      where id = v_produit_id;
+    end if;
+
+    v_total_brut := v_total_brut + (v_qte * v_prix_vente);
+    v_cout_total := v_cout_total + (v_qte * v_cout_unitaire);
+    v_items_out := v_items_out || jsonb_build_array(jsonb_build_object(
+      'produitId', v_produit_id, 'nom', v_nom, 'mode', coalesce(v_item->>'mode','detail'),
+      'qte', v_qte, 'uniteParLot', v_unite_par_lot, 'prixVente', v_prix_vente, 'coutUnitaire', v_cout_unitaire));
+  end loop;
+
+  v_remise := case when p_remise_valeur is null or p_remise_valeur <= 0 then 0
+    when p_remise_type = 'pourcentage' then greatest(0, least(v_total_brut * (p_remise_valeur/100.0), v_total_brut))
+    else greatest(0, least(p_remise_valeur, v_total_brut)) end;
+  v_total := greatest(0, v_total_brut - v_remise);
+
+  if not p_encaissement_partiel and p_montant_recu < v_total then raise exception 'Montant reçu insuffisant'; end if;
+  if p_encaissement_partiel and p_client_id is null then raise exception 'Un client est requis pour un encaissement partiel'; end if;
+
+  v_reste := case when p_encaissement_partiel then greatest(0, v_total - p_montant_recu) else 0 end;
+  v_montant_paye := v_total - v_reste;
+  v_monnaie := greatest(0, p_montant_recu - v_total);
+  v_mode_final := case when v_reste > 0 then 'credit' else p_mode_paiement end;
+
+  update ventes set
+    date = now(), items = v_items_out, total_brut = v_total_brut, remise = v_remise, total = v_total,
+    cout_total = v_cout_total, mode_paiement = v_mode_final, montant_recu = p_montant_recu,
+    monnaie_rendue = v_monnaie, montant_paye = v_montant_paye, reste = v_reste,
+    client_id = case when v_reste > 0 or p_client_id is not null then p_client_id else null end,
+    paiements = '[]'::jsonb
+  where id = p_vente_id;
+
+  if p_mode_paiement = 'cash' then
+    if p_montant_recu > 0 then
+      insert into caisse_movements (magasin_id, date, type, montant, motif, employe_id, source, vente_id)
+      values (v_old.magasin_id, now(), 'entree', p_montant_recu, 'Vente ' || v_old.numero, v_employe.id, 'vente', p_vente_id);
+    end if;
+    if v_monnaie > 0 then
+      insert into caisse_movements (magasin_id, date, type, montant, motif, employe_id, source, vente_id)
+      values (v_old.magasin_id, now(), 'sortie', v_monnaie, 'Monnaie rendue — ' || v_old.numero, v_employe.id, 'monnaie', p_vente_id);
+    end if;
+  end if;
+
+  insert into journal (date, action, details, employe_id, magasin_id)
+  values (now(), 'Fiche ' || v_old.numero || ' modifiée', v_total::text || ' · ' || v_mode_final, v_employe.id, v_old.magasin_id);
+
+  return (select v from ventes v where v.id = p_vente_id);
+end;
+$$;
+
+-- ---------------------------------------------------------
+-- rpc_delete_vente — Admin uniquement. Restitue le stock ; les
+-- mouvements de caisse liés partent automatiquement (ON DELETE
+-- CASCADE via vente_id).
+-- ---------------------------------------------------------
+create or replace function rpc_delete_vente(p_vente_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_vente ventes;
+  v_item jsonb;
+  v_employe employes;
+begin
+  v_employe := current_employe_row();
+  if not is_admin() then raise exception 'Seul un administrateur peut supprimer une vente'; end if;
+  select * into v_vente from ventes where id = p_vente_id for update;
+  if not found then raise exception 'Vente introuvable'; end if;
+
+  for v_item in select * from jsonb_array_elements(v_vente.items) loop
+    update produits set quantite_detail = quantite_detail + (
+      case when (v_item->>'mode') = 'gros'
+        then (v_item->>'qte')::int * (v_item->>'uniteParLot')::int
+        else (v_item->>'qte')::int end
+    ) where id = (v_item->>'produitId')::uuid;
+  end loop;
+
+  delete from ventes where id = p_vente_id;
+
+  insert into journal (date, action, details, employe_id, magasin_id)
+  values (now(), 'Vente supprimée', v_vente.numero || ' · ' || v_vente.total::text, v_employe.id, v_vente.magasin_id);
+end;
+$$;
+
+-- ---------------------------------------------------------
+-- rpc_pay_client_debt — paiement partiel réparti sur les fiches
+-- les plus anciennes d'un client (FIFO), comme l'app d'origine.
+-- ---------------------------------------------------------
+create or replace function rpc_pay_client_debt(p_client_id uuid, p_montant numeric, p_mode text)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_employe employes;
+  v_client clients;
+  v_vente ventes;
+  v_restant numeric := p_montant;
+  v_pay numeric;
+begin
+  v_employe := current_employe_row();
+  if v_employe.id is null then raise exception 'Employé non authentifié'; end if;
+  if not (has_perm('clients') or has_perm('fiches') or has_perm('caisse')) then
+    raise exception 'Permission refusée';
+  end if;
+  if p_montant <= 0 then raise exception 'Montant invalide'; end if;
+  select * into v_client from clients where id = p_client_id;
+  if not found then raise exception 'Client introuvable'; end if;
+
+  for v_vente in select * from ventes where client_id = p_client_id and reste > 0 order by date asc for update loop
+    exit when v_restant <= 0;
+    v_pay := least(v_restant, v_vente.reste);
+    update ventes set
+      reste = reste - v_pay,
+      montant_paye = montant_paye + v_pay,
+      paiements = paiements || jsonb_build_array(jsonb_build_object(
+        'id', gen_random_uuid(), 'montant', v_pay, 'mode', p_mode, 'date', now(), 'employeId', v_employe.id))
+    where id = v_vente.id;
+    v_restant := v_restant - v_pay;
+  end loop;
+
+  if p_mode = 'cash' and p_montant > 0 then
+    insert into caisse_movements (magasin_id, date, type, montant, motif, employe_id, source)
+    values (v_client.magasin_id, now(), 'entree', p_montant, 'Paiement dette — ' || v_client.nom, v_employe.id, 'paiement_dette');
+  end if;
+
+  insert into journal (date, action, details, employe_id, magasin_id)
+  values (now(), 'Paiement de dette reçu', v_client.nom || ' · ' || p_montant::text, v_employe.id, v_client.magasin_id);
+end;
+$$;
+
+-- ---------------------------------------------------------
+-- rpc_pay_vente — paiement partiel sur une fiche précise.
+-- ---------------------------------------------------------
+create or replace function rpc_pay_vente(p_vente_id uuid, p_montant numeric, p_mode text)
+returns ventes language plpgsql security definer set search_path = public as $$
+declare
+  v_employe employes;
+  v_vente ventes;
+  v_pay numeric;
+begin
+  v_employe := current_employe_row();
+  if v_employe.id is null then raise exception 'Employé non authentifié'; end if;
+  if not (has_perm('clients') or has_perm('fiches') or has_perm('caisse') or has_perm('vente')) then
+    raise exception 'Permission refusée';
+  end if;
+  if p_montant <= 0 then raise exception 'Montant invalide'; end if;
+  select * into v_vente from ventes where id = p_vente_id for update;
+  if not found then raise exception 'Vente introuvable'; end if;
+  v_pay := least(p_montant, v_vente.reste);
+  if v_pay <= 0 then raise exception 'Rien à payer sur cette fiche'; end if;
+
+  update ventes set
+    reste = reste - v_pay,
+    montant_paye = montant_paye + v_pay,
+    paiements = paiements || jsonb_build_array(jsonb_build_object(
+      'id', gen_random_uuid(), 'montant', v_pay, 'mode', p_mode, 'date', now(), 'employeId', v_employe.id))
+  where id = p_vente_id;
+
+  if p_mode = 'cash' then
+    insert into caisse_movements (magasin_id, date, type, montant, motif, employe_id, source, vente_id)
+    values (v_vente.magasin_id, now(), 'entree', v_pay, 'Paiement fiche ' || v_vente.numero, v_employe.id, 'paiement_dette', p_vente_id);
+  end if;
+
+  insert into journal (date, action, details, employe_id, magasin_id)
+  values (now(), 'Paiement reçu sur fiche', v_vente.numero || ' · ' || v_pay::text, v_employe.id, v_vente.magasin_id);
+
+  return (select v from ventes v where v.id = p_vente_id);
+end;
+$$;
+
+-- ---------------------------------------------------------
+-- rpc_execute_transfert — déplace du stock entre deux magasins,
+-- crée le produit côté destination si nécessaire (copie sa
+-- config), en une seule transaction verrouillée.
+-- p_items: [{"produit_id":"uuid","qte":n}]
+-- ---------------------------------------------------------
+create or replace function rpc_execute_transfert(p_source_id uuid, p_dest_id uuid, p_items jsonb)
+returns transferts language plpgsql security definer set search_path = public as $$
+declare
+  v_employe employes;
+  v_item jsonb;
+  v_produit_id uuid;
+  v_qte int;
+  v_src produits;
+  v_dst_id uuid;
+  v_stock_total int;
+  v_caisses_needed int;
+  v_reste_u int;
+  v_numero text;
+  v_id uuid;
+  v_items_out jsonb := '[]'::jsonb;
+begin
+  v_employe := current_employe_row();
+  if v_employe.id is null then raise exception 'Employé non authentifié'; end if;
+  if not has_perm('transferts') then raise exception 'Permission refusée : transferts'; end if;
+  if p_source_id = p_dest_id then raise exception 'Source et destination identiques'; end if;
+  if p_items is null or jsonb_array_length(p_items) = 0 then raise exception 'Aucun article sélectionné'; end if;
+
+  v_numero := 'T' || to_char(now(),'YYMMDDHH24MISS') || substr(md5(random()::text || clock_timestamp()::text),1,4);
+  v_id := gen_random_uuid();
+
+  for v_item in select * from jsonb_array_elements(p_items) loop
+    v_produit_id := (v_item->>'produit_id')::uuid;
+    v_qte := greatest(1, (v_item->>'qte')::int);
+    select * into v_src from produits where id = v_produit_id and magasin_id = p_source_id for update;
+    if not found then raise exception 'Produit introuvable dans le magasin source'; end if;
+
+    v_stock_total := v_src.quantite_caisse * v_src.quantite_par_caisse + v_src.quantite_detail;
+    if v_qte > v_stock_total then raise exception 'Stock insuffisant pour %', v_src.nom; end if;
+
+    if v_src.quantite_detail >= v_qte then
+      update produits set quantite_detail = quantite_detail - v_qte where id = v_produit_id;
+    else
+      v_reste_u := v_qte - v_src.quantite_detail;
+      v_caisses_needed := ceil(v_reste_u::numeric / greatest(v_src.quantite_par_caisse,1));
+      update produits set
+        quantite_caisse = quantite_caisse - v_caisses_needed,
+        quantite_detail = (v_caisses_needed * greatest(v_src.quantite_par_caisse,1)) - v_reste_u
+      where id = v_produit_id;
+    end if;
+
+    select id into v_dst_id from produits where magasin_id = p_dest_id and lower(nom) = lower(v_src.nom) limit 1 for update;
+    if v_dst_id is null then
+      insert into produits (magasin_id, nom, categorie, quantite_par_caisse, prix_achat, quantite_caisse,
+        quantite_detail, prix_vente_detail, lots, stock_initial, stock_minimum, archive)
+      values (p_dest_id, v_src.nom, v_src.categorie, v_src.quantite_par_caisse, v_src.prix_achat, 0,
+        v_qte, v_src.prix_vente_detail,
+        coalesce((select jsonb_agg(jsonb_build_object('id', gen_random_uuid(), 'taille', (l->>'taille')::int, 'prix', (l->>'prix')::numeric))
+           from jsonb_array_elements(v_src.lots) l), '[]'::jsonb),
+        0, v_src.stock_minimum, false);
+    else
+      update produits set quantite_detail = quantite_detail + v_qte where id = v_dst_id;
+    end if;
+
+    v_items_out := v_items_out || jsonb_build_array(jsonb_build_object('produitId', v_produit_id, 'nom', v_src.nom, 'qte', v_qte));
+  end loop;
+
+  insert into transferts (id, numero, date, magasin_source_id, magasin_dest_id, items, employe_id)
+  values (v_id, v_numero, now(), p_source_id, p_dest_id, v_items_out, v_employe.id);
+
+  insert into journal (date, action, details, employe_id, magasin_id)
+  values (now(), 'Transfert ' || v_numero, (select nom from magasins where id = p_dest_id), v_employe.id, p_source_id);
+
+  return (select t from transferts t where t.id = v_id);
+end;
+$$;
+
+-- ---------------------------------------------------------
+-- rpc_add_achat — enregistre un achat fournisseur et incrémente
+-- le stock détail de façon atomique si demandé.
+-- ---------------------------------------------------------
+create or replace function rpc_add_achat(
+  p_magasin_id uuid, p_produit_id uuid, p_date date, p_fournisseur text,
+  p_quantite int, p_prix_total numeric, p_ajout_stock boolean
+) returns achats language plpgsql security definer set search_path = public as $$
+declare
+  v_employe employes;
+  v_produit produits;
+  v_achat achats;
+begin
+  v_employe := current_employe_row();
+  if not has_perm('achats') then raise exception 'Permission refusée : achats'; end if;
+  select * into v_produit from produits where id = p_produit_id for update;
+  if not found then raise exception 'Produit introuvable'; end if;
+  if p_quantite <= 0 then raise exception 'Quantité invalide'; end if;
+
+  insert into achats (magasin_id, date, produit_id, nom, quantite, prix_total, fournisseur, employe_id)
+  values (p_magasin_id, p_date::timestamptz + time '12:00', p_produit_id, v_produit.nom, p_quantite, p_prix_total, coalesce(p_fournisseur,''), v_employe.id)
+  returning * into v_achat;
+
+  if p_ajout_stock then
+    update produits set quantite_detail = quantite_detail + p_quantite where id = p_produit_id;
+  end if;
+
+  insert into journal (date, action, details, employe_id, magasin_id)
+  values (now(), 'Achat enregistré', v_produit.nom || ' · ' || p_quantite::text || ' · ' || p_prix_total::text || coalesce(' · '||nullif(p_fournisseur,''),''), v_employe.id, p_magasin_id);
+
+  return v_achat;
+end;
+$$;
+
+-- ---------------------------------------------------------
+-- rpc_pay_salaire — enregistre un paiement de salaire et, si
+-- réglé en espèces, la sortie de caisse correspondante.
+-- ---------------------------------------------------------
+create or replace function rpc_pay_salaire(p_magasin_id uuid, p_employe_id uuid, p_montant numeric, p_periode text, p_mode text)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_employe employes;
+  v_emp_target employes;
+begin
+  v_employe := current_employe_row();
+  if not has_perm('employes') then raise exception 'Permission refusée : employes'; end if;
+  if p_montant <= 0 then raise exception 'Montant invalide'; end if;
+  select * into v_emp_target from employes where id = p_employe_id;
+  if not found then raise exception 'Employé introuvable'; end if;
+
+  insert into payroll_paiements (employe_id, montant, date, periode)
+  values (p_employe_id, p_montant, now(), coalesce(p_periode,''));
+
+  if p_mode = 'cash' then
+    insert into caisse_movements (magasin_id, date, type, montant, motif, employe_id, source)
+    values (p_magasin_id, now(), 'sortie', p_montant, 'Salaire — ' || v_emp_target.nom || ' (' || coalesce(p_periode,'') || ')', v_employe.id, 'payroll');
+  end if;
+
+  insert into journal (date, action, details, employe_id, magasin_id)
+  values (now(), 'Salaire payé', v_emp_target.nom || ' · ' || p_montant::text, v_employe.id, p_magasin_id);
+end;
+$$;
+
+-- ---------------------------------------------------------
+-- rpc_auto_archive_produits_inactifs — appelée par le client au
+-- chargement (comme l'ancienne autoArchiverProduitsInactifs), ou
+-- planifiable via pg_cron pour tourner une fois par jour.
+-- ---------------------------------------------------------
+create or replace function rpc_auto_archive_produits_inactifs()
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_produit record;
+  v_dernier timestamptz;
+  v_employe employes;
+begin
+  v_employe := current_employe_row();
+  if v_employe.id is null then return; end if;
+  for v_produit in select * from produits where archive = false and date_creation <= now() - interval '60 days' loop
+    select max((v->>'date')::timestamptz) into v_dernier
+    from ventes vt, jsonb_array_elements(vt.items) v
+    where (v->>'produitId')::uuid = v_produit.id;
+    if v_dernier is null or v_dernier <= now() - interval '60 days' then
+      update produits set archive = true where id = v_produit.id;
+      insert into journal (date, action, details, employe_id, magasin_id)
+      values (now(), 'Produit archivé automatiquement (aucune vente récente)', v_produit.nom, v_employe.id, v_produit.magasin_id);
+    end if;
+  end loop;
+end;
+$$;
+
+-- Autorise l'appel de ces fonctions par les rôles applicatifs
+-- (RLS + vérifications internes restent l'unique barrière).
+grant execute on function
+  rpc_finalize_sale, rpc_modifier_vente, rpc_delete_vente,
+  rpc_pay_client_debt, rpc_pay_vente, rpc_execute_transfert,
+  rpc_add_achat, rpc_pay_salaire, rpc_auto_archive_produits_inactifs
+to authenticated;
