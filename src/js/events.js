@@ -507,11 +507,22 @@ export function attachAllEvents(ctx){
     };
     const catSelect = document.getElementById('f-categorie-select');
     const catNewInput = document.getElementById('f-categorie-new');
+    const showCatNewInput = ()=>{
+      catNewInput.style.display = '';
+      catNewInput.focus();
+    };
     if(catSelect && catNewInput){
       catSelect.onchange = ()=>{
         const isNew = catSelect.value === '__new__';
         catNewInput.style.display = isNew ? '' : 'none';
         if(isNew) catNewInput.focus();
+      };
+    }
+    const btnCatNewInline = document.getElementById('btn-cat-new-inline');
+    if(btnCatNewInline && catSelect && catNewInput){
+      btnCatNewInline.onclick = ()=>{
+        catSelect.value = '__new__';
+        showCatNewInput();
       };
     }
   }

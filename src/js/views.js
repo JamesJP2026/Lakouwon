@@ -942,11 +942,14 @@ function modalProduit(ctx){
     <div class="row2">
       <div class="field"><label>Nom du produit</label><input id="f-nom" value="${p.nom}"></div>
       <div class="field"><label>Catégorie</label>
-        <select id="f-categorie-select">
-          <option value="">— Sans catégorie —</option>
-          ${categoriesExistantes.map(c=>`<option value="${c}" ${p.categorie===c?'selected':''}>${c}</option>`).join('')}
-          <option value="__new__">+ Créer une nouvelle catégorie...</option>
-        </select>
+        <div style="display:flex; gap:6px;">
+          <select id="f-categorie-select" style="flex:1;">
+            <option value="">— Sans catégorie —</option>
+            ${categoriesExistantes.map(c=>`<option value="${c}" ${p.categorie===c?'selected':''}>${c}</option>`).join('')}
+            <option value="__new__">+ Créer une nouvelle catégorie...</option>
+          </select>
+          <button type="button" class="btn btn-sm" id="btn-cat-new-inline" title="Créer une nouvelle catégorie">+ Créer</button>
+        </div>
         <input id="f-categorie-new" placeholder="Nom de la nouvelle catégorie" style="display:none; margin-top:6px;">
       </div>
     </div>
