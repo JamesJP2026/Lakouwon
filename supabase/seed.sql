@@ -12,9 +12,8 @@ insert into magasins (nom)
 select 'Magasin Principal'
 where not exists (select 1 from magasins);
 
--- Le tout premier compte Administrateur ne se crée PAS ici (il a
--- besoin d'un compte Supabase Auth) : utilisez l'Edge Function
--- `admin-employee` avec l'action "bootstrap" juste après avoir
--- exécuté ce fichier — voir README.md, section "Premier
--- démarrage". Elle ne fonctionne qu'une seule fois, tant que la
--- table `employes` est vide.
+-- Le tout premier compte Administrateur ne se crée PAS ici : ouvrez
+-- simplement l'application une fois déployée — tant que `employes`
+-- est vide, elle affiche l'écran "Configuration initiale" qui crée
+-- le compte (Supabase Auth + ligne employes) directement depuis le
+-- navigateur, via la policy RLS `employes_bootstrap_insert`.

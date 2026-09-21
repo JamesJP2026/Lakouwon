@@ -85,6 +85,22 @@ drop policy if exists employes_select on employes;
 create policy employes_select on employes for select using (is_active_employe());
 drop policy if exists employes_insert on employes;
 create policy employes_insert on employes for insert with check (has_perm('employes'));
+
+-- Amorçage du tout premier compte : autorise un utilisateur qui vient
+-- de créer son compte Supabase Auth (auth.uid()) à s'insérer lui-même
+-- comme Admin, mais UNIQUEMENT tant que la table employes est vide.
+-- Dès qu'une ligne existe, cette policy ne s'applique plus jamais —
+-- pas besoin d'une fonction serveur à privilèges élevés pour amorcer
+-- le système.
+drop policy if exists employes_bootstrap_insert on employes;
+create policy employes_bootstrap_insert on employes for insert
+  with check (
+    not exists (select 1 from employes)
+    and auth_user_id = auth.uid()
+    and role = 'Admin'
+    and actif = true
+  );
+
 drop policy if exists employes_update on employes;
 create policy employes_update on employes for update using (has_perm('employes')) with check (has_perm('employes'));
 drop policy if exists employes_delete on employes;

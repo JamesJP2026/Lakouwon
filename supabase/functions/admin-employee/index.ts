@@ -19,13 +19,18 @@
 //   SUPABASE_SERVICE_ROLE_KEY
 //
 // Actions (POST JSON { action, ...payload }) :
-//   - "bootstrap"      : crée le tout premier compte Admin.
-//                        Refusée dès qu'un employé existe déjà.
 //   - "set_password"   : (réservée aux Admins) crée le compte
 //                        d'authentification d'un employé existant
 //                        s'il n'en a pas, ou réinitialise son mot
 //                        de passe sinon. Retourne le mot de passe
 //                        généré UNE SEULE FOIS.
+//
+// Le tout premier compte Admin ne passe PAS par cette fonction : il
+// est créé directement depuis le client via supabase.auth.signUp() +
+// une insertion dans `employes` autorisée par la policy RLS
+// `employes_bootstrap_insert` (voir supabase/policies.sql), tant que
+// la table est vide. Cela évite d'avoir à exempter cette fonction de
+// la vérification de JWT de la plateforme pour un appel pré-connexion.
 // =========================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -69,55 +74,8 @@ Deno.serve(async (req) => {
   const action = payload.action;
 
   // -------------------------------------------------------
-  // BOOTSTRAP — premier compte Admin, une seule fois.
-  // -------------------------------------------------------
-  if (action === "bootstrap") {
-    const { nom, email, password } = payload as { nom?: string; email?: string; password?: string };
-    if (!nom || !email || !password) return json({ error: "nom, email et password sont requis" }, 400);
-    if (password.length < 6) return json({ error: "Le mot de passe doit contenir au moins 6 caractères" }, 400);
-
-    const { count, error: countError } = await admin.from("employes").select("id", { count: "exact", head: true });
-    if (countError) return json({ error: countError.message }, 500);
-    if ((count ?? 0) > 0) {
-      return json({ error: "Un compte existe déjà — le bootstrap est désactivé. Utilisez set_password (Admin connecté)." }, 403);
-    }
-
-    const { data: userRes, error: userErr } = await admin.auth.admin.createUser({
-      email: String(email).toLowerCase(),
-      password,
-      email_confirm: true,
-    });
-    if (userErr) return json({ error: userErr.message }, 400);
-
-    const { data: magasin } = await admin.from("magasins").select("id").limit(1).maybeSingle();
-
-    const { data: employe, error: empErr } = await admin
-      .from("employes")
-      .insert({
-        auth_user_id: userRes.user.id,
-        nom,
-        role: "Admin",
-        magasin_id: magasin?.id ?? null,
-        email: String(email).toLowerCase(),
-        permissions: [
-          "dashboard","vente","fiches","proforma","produits","clients","caisse",
-          "depenses","transferts","achats","rapport","employes","journal","parametres",
-        ],
-        actif: true,
-      })
-      .select()
-      .single();
-    if (empErr) {
-      await admin.auth.admin.deleteUser(userRes.user.id);
-      return json({ error: empErr.message }, 500);
-    }
-
-    return json({ employe });
-  }
-
-  // -------------------------------------------------------
-  // Actions réservées aux Admins connectés : vérifier le JWT
-  // de l'appelant avant toute autre chose.
+  // Toutes les actions restantes exigent un Admin connecté :
+  // vérifier le JWT de l'appelant avant toute autre chose.
   // -------------------------------------------------------
   const authHeader = req.headers.get("Authorization") ?? "";
   const callerClient = createClient(SUPABASE_URL, ANON_KEY, {

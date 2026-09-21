@@ -410,11 +410,29 @@ function attachSetupEvents(){
     if(pw!==pw2){ loginError='Les mots de passe ne correspondent pas.'; render(); return; }
     if(pw.length<6){ loginError='Le mot de passe doit contenir au moins 6 caractères.'; render(); return; }
     busy = true; loginError=''; render();
-    const { data, error } = await supabase.functions.invoke('admin-employee', { body:{ action:'bootstrap', nom, email, password:pw } });
+
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password: pw });
+    if(signUpError){ busy=false; loginError = friendlyError(signUpError); render(); return; }
+    if(!signUpData.session){
+      busy = false;
+      loginError = "Compte créé, mais aucune session n'a été ouverte automatiquement — désactivez \"Confirm email\" dans Supabase (Authentication → Providers → Email) puis réessayez, ou confirmez l'email reçu avant de vous reconnecter normalement.";
+      render();
+      return;
+    }
+
+    const { error: insertError } = await supabase.from('employes').insert({
+      auth_user_id: signUpData.user.id, nom, email, role: 'Admin', actif: true,
+      permissions: PERMS_ALL,
+    });
+    if(insertError){
+      busy = false;
+      loginError = friendlyError(insertError);
+      render();
+      return;
+    }
     busy = false;
-    if(error || data?.error){ loginError = data?.error || await edgeFunctionErrorMessage(error); render(); return; }
     bootstrapNeeded = false;
-    await doLogin(email, pw);
+    await bootAfterAuth();
   };
 }
 

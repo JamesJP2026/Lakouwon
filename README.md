@@ -114,9 +114,15 @@ npx serve .
 ```
 Ouvrez la page — comme la table `employes` est vide, l'écran
 **« Configuration initiale »** apparaît automatiquement. Remplissez-le
-pour créer le premier compte Administrateur (ceci appelle l'Edge
-Function avec l'action `bootstrap`, qui ne fonctionne qu'une seule
-fois, tant qu'aucun employé n'existe).
+pour créer le premier compte Administrateur : ceci crée le compte
+Supabase Auth directement depuis le navigateur (`supabase.auth.signUp`)
+puis s'auto-insère dans `employes` grâce à la policy RLS
+`employes_bootstrap_insert`, qui n'autorise cette auto-insertion que
+tant qu'aucun employé n'existe encore. Si votre projet a l'option
+« Confirm email » activée (Authentication → Providers → Email), la
+session ne s'ouvre pas immédiatement après l'inscription — désactivez
+cette option pour un outil interne comme celui-ci, ou confirmez
+l'email reçu puis reconnectez-vous normalement.
 
 ### 3.6. Déployer le frontend
 Le dossier est un site statique : déployez-le sur Netlify, Vercel, ou
