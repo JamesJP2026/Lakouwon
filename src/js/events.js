@@ -505,15 +505,29 @@ export function attachAllEvents(ctx){
       const editor = document.getElementById('lots-editor');
       if(editor){ editor.innerHTML = lotsEditorHTML(ctx, currentProduitDraft()); attachLotsEditorEvents(ctx, currentProduitDraft()); }
     };
+    const catSelect = document.getElementById('f-categorie-select');
+    const catNewInput = document.getElementById('f-categorie-new');
+    if(catSelect && catNewInput){
+      catSelect.onchange = ()=>{
+        const isNew = catSelect.value === '__new__';
+        catNewInput.style.display = isNew ? '' : 'none';
+        if(isNew) catNewInput.focus();
+      };
+    }
   }
 
   const btnSaveProduit = document.getElementById('btn-save-produit');
   if(btnSaveProduit) btnSaveProduit.onclick = async ()=>{
     const nom = document.getElementById('f-nom').value.trim();
     if(!nom){ ctx.showToast('Le nom du produit est requis'); return; }
+    const catSelectVal = document.getElementById('f-categorie-select').value;
+    const categorie = catSelectVal === '__new__'
+      ? document.getElementById('f-categorie-new').value.trim()
+      : catSelectVal;
+    if(catSelectVal==='__new__' && !categorie){ ctx.showToast('Entrez le nom de la nouvelle catégorie'); return; }
     const data = {
       nom,
-      categorie: document.getElementById('f-categorie').value.trim(),
+      categorie,
       quantite_par_caisse: Math.max(1, parseInt(document.getElementById('f-quantiteParCaisse').value)||1),
       prix_achat: parseFloat(document.getElementById('f-prixAchat').value)||0,
       quantite_caisse: parseInt(document.getElementById('f-quantiteCaisse').value)||0,
