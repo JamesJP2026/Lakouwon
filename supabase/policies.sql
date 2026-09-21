@@ -111,7 +111,8 @@ create policy employes_delete on employes for delete using (has_perm('employes')
 create or replace function enforce_admin_role_promotion()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  if new.role = 'Admin' and (tg_op = 'INSERT' or old.role is distinct from 'Admin') and not is_admin() then
+  if new.role = 'Admin' and (tg_op = 'INSERT' or old.role is distinct from 'Admin')
+     and not is_admin() and exists (select 1 from employes) then
     raise exception 'Seul un administrateur peut attribuer le rôle Admin';
   end if;
   return new;
