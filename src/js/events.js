@@ -167,7 +167,7 @@ export function attachAllEvents(ctx){
   const btnNewProduit = document.getElementById('btn-new-produit'); if(btnNewProduit) btnNewProduit.onclick = ()=>{ ctx.productLotsDraft=[]; ctx.editing={type:'produit', id:null}; ctx.render(); };
   document.querySelectorAll('[data-edit-produit]').forEach(b=>b.onclick = ()=>{
     const prod = state.produits.find(x=>x.id===b.dataset.editProduit);
-    ctx.productLotsDraft = (prod.lots||[]).map(l=>({...l}));
+    ctx.productLotsDraft = (prod.lots||[]).filter(l=>l.taille!==prod.quantiteParCaisse).map(l=>({...l}));
     ctx.editing={type:'produit', id:b.dataset.editProduit}; ctx.render();
   });
   document.querySelectorAll('[data-archive-produit]').forEach(b=>b.onclick = async ()=>{
@@ -450,6 +450,8 @@ export function attachAllEvents(ctx){
       const pa = parseFloat(document.getElementById('f-prixAchat').value)||0;
       const pvd = parseFloat(document.getElementById('f-prixVenteDetail').value)||0;
       liveInfoBox.innerHTML = produitLiveInfoHTML(ctx, qpc, qc, qdFixe, pa, pvd);
+      const grosLabel = document.getElementById('gros-qty-label');
+      if(grosLabel) grosLabel.textContent = qpc;
     };
     ['f-quantiteParCaisse','f-quantiteCaisse','f-prixAchat','f-prixVenteDetail'].forEach(id=>{
       const el = document.getElementById(id); if(el) el.oninput = updateLive;
@@ -493,6 +495,10 @@ export function attachAllEvents(ctx){
       stock_minimum: parseInt(document.getElementById('f-stockMinimum').value)||0,
       lots: ctx.productLotsDraft.filter(l=>l.taille>0 && l.prix>=0).map(l=>({id:l.id||ctx.uid(), taille:l.taille, prix:l.prix})),
     };
+    const prixVenteGros = parseFloat(document.getElementById('f-prixVenteGros').value)||0;
+    if(prixVenteGros > 0){
+      data.lots.push({id:ctx.uid(), taille:data.quantite_par_caisse, prix:prixVenteGros});
+    }
     if(ctx.editing.id){
       const { error } = await supabase.from('produits').update(data).eq('id', ctx.editing.id);
       if(error){ ctx.showToast(ctx.friendlyError(error)); return; }

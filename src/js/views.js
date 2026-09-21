@@ -907,11 +907,16 @@ function modalProduit(ctx){
     nom:'',categorie:'',prixAchat:0,quantiteParCaisse:1,prixVenteDetail:0,
     quantiteCaisse:0,quantiteDetail:0,stockInitial:0,stockMinimum:5,lots:[]
   };
+  const categoriesExistantes = [...new Set(state.produits.map(x=>x.categorie).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const lotCaisse = (p.lots||[]).find(l=>l.taille===(p.quantiteParCaisse||1));
   return `<div class="overlay" id="overlay"><div class="modal wide">
     <h2>${ctx.editing.id?'Modifier le produit':'Nouveau produit'}</h2>
     <div class="row2">
       <div class="field"><label>Nom du produit</label><input id="f-nom" value="${p.nom}"></div>
-      <div class="field"><label>Catégorie</label><input id="f-categorie" value="${p.categorie||''}"></div>
+      <div class="field"><label>Catégorie</label>
+        <input id="f-categorie" value="${p.categorie||''}" list="categories-list" placeholder="Choisir ou taper une nouvelle catégorie">
+        <datalist id="categories-list">${categoriesExistantes.map(c=>`<option value="${c}">`).join('')}</datalist>
+      </div>
     </div>
     <div class="row2">
       <div class="field"><label>Quantité par caisse (unités)</label><input type="number" id="f-quantiteParCaisse" value="${p.quantiteParCaisse||1}" min="1"></div>
@@ -923,11 +928,16 @@ function modalProduit(ctx){
         <div class="muted" style="font-size:11px; margin-top:3px;">Se met à jour automatiquement lors des ventes (une caisse est ouverte si besoin). Non modifiable ici.</div>
       </div>
     </div>
-    <div class="field"><label>Prix de vente en détail (par unité)</label><input type="number" id="f-prixVenteDetail" value="${p.prixVenteDetail}" min="0"></div>
+    <div class="row2">
+      <div class="field"><label>Prix de vente en détail (par unité)</label><input type="number" id="f-prixVenteDetail" value="${p.prixVenteDetail}" min="0"></div>
+      <div class="field"><label>Prix de vente en gros (pour <span id="gros-qty-label">${p.quantiteParCaisse||1}</span> unité(s), soit 1 caisse)</label>
+        <input type="number" id="f-prixVenteGros" min="0" value="${lotCaisse?lotCaisse.prix:''}" placeholder="Laisser vide si non applicable">
+      </div>
+    </div>
     <div class="info-box" id="live-info-box">${produitLiveInfoHTML(ctx, p.quantiteParCaisse||1, p.quantiteCaisse||0, p.quantiteDetail||0, p.prixAchat||0, p.prixVenteDetail||0)}</div>
 
     <div class="field">
-      <label>Vente en lot — types de lots disponibles (ex: 3, 6, 12 unités)</label>
+      <label>Autres tailles de lot (optionnel — ex: lot de 3, 12 unités)</label>
       <div id="lots-editor">${lotsEditorHTML(ctx, p)}</div>
       <button type="button" class="btn btn-sm" id="btn-add-lot-row">+ Ajouter un type de lot</button>
     </div>
