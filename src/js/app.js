@@ -19,11 +19,13 @@ const ROW_MAPS = {
   caisse_movements: { id:'id', magasin_id:'magasinId', date:'date', type:'type', montant:'montant', motif:'motif', employe_id:'employeId', source:'source', vente_id:'venteId' },
   payroll_paiements: { id:'id', employe_id:'employeId', montant:'montant', date:'date', periode:'periode' },
   journal: { id:'id', date:'date', action:'action', details:'details', employe_id:'employeId', magasin_id:'magasinId' },
+  categories: { id:'id', nom:'nom', created_at:'createdAt' },
 };
 const TABLE_TO_STATE_KEY = {
   settings:'settings', magasins:'magasins', employes:'employes', produits:'produits', clients:'clients',
   ventes:'ventes', proformas:'proformas', transferts:'transferts', achats:'achats',
   caisse_movements:'caisseMovements', payroll_paiements:'payrollPaiements', journal:'journal',
+  categories:'categories',
 };
 function mapRow(table, row){
   const map = ROW_MAPS[table]; const out = {};
@@ -121,7 +123,7 @@ function emptyState(){
     settings:{ nomCommerce:'Mon Commerce', adresse:'', email:'', telephone:'', devise:'HTG', logo:'', couleurPrimaire:'#132340', couleurAccent:'#c8973f' },
     magasins:[], currentMagasinId:'', currentUserId:'',
     employes:[], payrollPaiements:[], produits:[], clients:[], ventes:[], proformas:[],
-    transferts:[], achats:[], caisseMovements:[], journal:[]
+    transferts:[], achats:[], caisseMovements:[], journal:[], categories:[]
   };
 }
 let state = emptyState();
@@ -185,7 +187,7 @@ async function edgeFunctionErrorMessage(err){
 /* =========================================================
    CHARGEMENT DES DONNÉES + TEMPS RÉEL
 ========================================================= */
-const DATA_TABLES = ['magasins','employes','produits','clients','ventes','proformas','transferts','achats','caisse_movements','payroll_paiements','journal'];
+const DATA_TABLES = ['magasins','employes','produits','clients','ventes','proformas','transferts','achats','caisse_movements','payroll_paiements','journal','categories'];
 let realtimeChannel = null;
 
 async function loadAllData(){

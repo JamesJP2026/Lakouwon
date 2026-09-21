@@ -708,6 +708,19 @@ export function renderParametres(ctx){
     <button class="btn" id="btn-new-magasin" style="margin-top:12px;">+ Ajouter un magasin</button>
   </div>
 
+  <div class="panel" style="max-width:560px;">
+    <h3>Catégories de produits</h3>
+    <p class="muted" style="margin-top:-6px; font-size:12.5px;">Créées ici, elles apparaissent ensuite comme suggestions dans le formulaire d'un produit.</p>
+    ${state.categories.length? state.categories.slice().sort((a,b)=>a.nom.localeCompare(b.nom)).map(c=>`<div class="alert-item">
+      <span>${c.nom}</span>
+      <button class="btn btn-sm btn-danger" data-del-categorie="${c.id}">Suppr.</button>
+    </div>`).join('') : `<div class="muted" style="padding:6px 0;">Aucune catégorie créée pour l'instant.</div>`}
+    <div class="row2" style="margin-top:12px;">
+      <input id="new-categorie-nom" placeholder="Ex: Boissons, Épicerie...">
+      <button class="btn btn-primary" id="btn-add-categorie">+ Ajouter</button>
+    </div>
+  </div>
+
   <div class="panel" style="max-width:640px;">
     <h3>Sauvegarde des données</h3>
     <p class="muted" style="margin-top:-6px; font-size:12.5px;">Les données sont stockées dans votre projet Supabase et partagées en temps réel entre tous les postes. Cet export sert de sauvegarde ponctuelle, pas de stockage principal.</p>
@@ -919,7 +932,10 @@ function modalProduit(ctx){
     nom:'',categorie:'',prixAchat:0,quantiteParCaisse:1,prixVenteDetail:0,
     quantiteCaisse:0,quantiteDetail:0,stockInitial:0,stockMinimum:5,lots:[]
   };
-  const categoriesExistantes = [...new Set(state.produits.map(x=>x.categorie).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  const categoriesExistantes = [...new Set([
+    ...state.categories.map(c=>c.nom),
+    ...state.produits.map(x=>x.categorie),
+  ].filter(Boolean))].sort((a,b)=>a.localeCompare(b));
   const lotCaisse = (p.lots||[]).find(l=>l.taille===(p.quantiteParCaisse||1));
   return `<div class="overlay" id="overlay"><div class="modal wide">
     <h2>${ctx.editing.id?'Modifier le produit':'Nouveau produit'}</h2>

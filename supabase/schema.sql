@@ -60,6 +60,17 @@ create table if not exists employes (
 create index if not exists idx_employes_auth_user on employes(auth_user_id);
 
 -- ---------------------------------------------------------
+-- CATEGORIES (liste gérée, proposée dans le formulaire produit —
+-- le champ `produits.categorie` reste un simple texte, ceci ne
+-- sert qu'à alimenter les suggestions/gestion)
+-- ---------------------------------------------------------
+create table if not exists categories (
+  id uuid primary key default gen_random_uuid(),
+  nom text not null unique,
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------
 -- PRODUITS
 -- ---------------------------------------------------------
 create table if not exists produits (
@@ -231,7 +242,7 @@ begin
   foreach t in array array[
     'settings','magasins','employes','produits','clients','ventes',
     'proformas','transferts','achats','caisse_movements',
-    'payroll_paiements','journal'
+    'payroll_paiements','journal','categories'
   ]
   loop
     if not exists (

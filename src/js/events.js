@@ -345,6 +345,26 @@ export function attachAllEvents(ctx){
     reader.readAsDataURL(file);
   };
   const btnNewMag = document.getElementById('btn-new-magasin'); if(btnNewMag) btnNewMag.onclick = ()=>{ ctx.magasinLogoDraft=null; ctx.editing={type:'magasin'}; ctx.render(); };
+  const btnAddCategorie = document.getElementById('btn-add-categorie');
+  if(btnAddCategorie) btnAddCategorie.onclick = async ()=>{
+    const input = document.getElementById('new-categorie-nom');
+    const nom = input.value.trim();
+    if(!nom){ ctx.showToast('Le nom de la catégorie est requis'); return; }
+    const { data, error } = await supabase.from('categories').insert({nom}).select().single();
+    if(error){ ctx.showToast(error.code==='23505' ? 'Cette catégorie existe déjà' : ctx.friendlyError(error)); return; }
+    ctx.upsertRow('categories', data);
+    input.value = '';
+    ctx.render();
+  };
+  document.querySelectorAll('[data-del-categorie]').forEach(b=>b.onclick = ()=>{
+    const cat = state.categories.find(x=>x.id===b.dataset.delCategorie);
+    ctx.askConfirm(`Supprimer la catégorie "${cat.nom}" ? Les produits qui l'utilisent déjà ne seront pas modifiés.`, async ()=>{
+      const { error } = await supabase.from('categories').delete().eq('id', cat.id);
+      if(error){ ctx.showToast(ctx.friendlyError(error)); return; }
+      state.categories = state.categories.filter(x=>x.id!==cat.id);
+      ctx.render();
+    });
+  });
   const btnExportData = document.getElementById('btn-export-data');
   if(btnExportData) btnExportData.onclick = ()=>{
     const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});

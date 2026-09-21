@@ -124,6 +124,17 @@ create trigger trg_employes_admin_promotion
   for each row execute function enforce_admin_role_promotion();
 
 -- ---------------------------------------------------------
+-- CATEGORIES
+-- ---------------------------------------------------------
+alter table categories enable row level security;
+drop policy if exists categories_select on categories;
+create policy categories_select on categories for select using (is_active_employe());
+drop policy if exists categories_insert on categories;
+create policy categories_insert on categories for insert with check (has_perm('produits'));
+drop policy if exists categories_delete on categories;
+create policy categories_delete on categories for delete using (has_perm('produits'));
+
+-- ---------------------------------------------------------
 -- PRODUITS
 -- ---------------------------------------------------------
 alter table produits enable row level security;
