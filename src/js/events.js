@@ -298,6 +298,12 @@ export function attachAllEvents(ctx){
     ctx.editing = {type:'confirmTransfert'}; ctx.render();
   };
   const btnValiderTransfert = document.getElementById('btn-valider-transfert'); if(btnValiderTransfert) btnValiderTransfert.onclick = ()=> executeTransfert(ctx);
+  document.querySelectorAll('[data-confirmer-transfert]').forEach(b=>b.onclick = ()=>{
+    ctx.askConfirm('Confirmer la réception de ce transfert ? Le stock sera ajouté à ce magasin.', ()=> confirmerTransfert(ctx, b.dataset.confirmerTransfert));
+  });
+  document.querySelectorAll('[data-annuler-transfert]').forEach(b=>b.onclick = ()=>{
+    ctx.askConfirm('Annuler ce transfert ? Le stock sera restitué au magasin source.', ()=> annulerTransfert(ctx, b.dataset.annulerTransfert));
+  });
 
   /* ---------------- Paramètres ---------------- */
   async function saveTheme(navy, gold){
@@ -794,10 +800,27 @@ async function executeTransfert(ctx){
   const src = ctx.transfertSourceId, dst = ctx.transfertDestId;
   if(!src || !dst || src===dst || ctx.transfertCart.length===0) return;
   const items = ctx.transfertCart.map(i=>({ produit_id: i.produitId, qte: i.qte }));
-  const { data, error } = await ctx.supabase.rpc('rpc_execute_transfert', { p_source_id: src, p_dest_id: dst, p_items: items });
+  const { data, error } = await ctx.supabase.rpc('rpc_creer_transfert', { p_source_id: src, p_dest_id: dst, p_items: items });
   if(error){ ctx.showToast(ctx.friendlyError(error)); return; }
   ctx.upsertRow('transferts', data);
   ctx.transfertCart=[]; ctx.transfertView='liste'; ctx.editing=null;
-  ctx.showToast('Transfert confirmé — stock mis à jour dans les deux magasins');
+  ctx.showToast('Transfert envoyé — en attente de confirmation de réception par le magasin destinataire');
+  ctx.render();
+}
+
+async function confirmerTransfert(ctx, transfertId){
+  const { data, error } = await ctx.supabase.rpc('rpc_confirmer_transfert', { p_transfert_id: transfertId });
+  if(error){ ctx.showToast(ctx.friendlyError(error)); return; }
+  ctx.upsertRow('transferts', data);
+  ctx.showToast('Réception confirmée — stock ajouté au magasin');
+  ctx.render();
+}
+
+async function annulerTransfert(ctx, transfertId){
+  const { error } = await ctx.supabase.rpc('rpc_annuler_transfert', { p_transfert_id: transfertId });
+  if(error){ ctx.showToast(ctx.friendlyError(error)); return; }
+  const t = ctx.state.transferts.find(x=>x.id===transfertId);
+  if(t) t.statut = 'annule';
+  ctx.showToast('Transfert annulé — stock restitué au magasin source');
   ctx.render();
 }

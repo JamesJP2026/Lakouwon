@@ -14,7 +14,7 @@ const ROW_MAPS = {
   clients: { id:'id', magasin_id:'magasinId', nom:'nom', telephone:'telephone' },
   ventes: { id:'id', numero:'numero', magasin_id:'magasinId', date:'date', items:'items', total_brut:'totalBrut', remise:'remise', total:'total', cout_total:'coutTotal', mode_paiement:'modePaiement', montant_recu:'montantRecu', monnaie_rendue:'monnaieRendue', montant_paye:'montantPaye', reste:'reste', client_id:'clientId', employe_id:'employeId', paiements:'paiements' },
   proformas: { id:'id', numero:'numero', magasin_id:'magasinId', date:'date', client_id:'clientId', client_nom_libre:'clientNomLibre', items:'items', total:'total', employe_id:'employeId', notes:'notes' },
-  transferts: { id:'id', numero:'numero', date:'date', magasin_source_id:'magasinSourceId', magasin_dest_id:'magasinDestId', items:'items', employe_id:'employeId' },
+  transferts: { id:'id', numero:'numero', date:'date', magasin_source_id:'magasinSourceId', magasin_dest_id:'magasinDestId', items:'items', employe_id:'employeId', statut:'statut', date_reception:'dateReception', confirme_par:'confirmePar' },
   achats: { id:'id', magasin_id:'magasinId', date:'date', produit_id:'produitId', nom:'nom', quantite:'quantite', prix_total:'prixTotal', fournisseur:'fournisseur', employe_id:'employeId' },
   caisse_movements: { id:'id', magasin_id:'magasinId', date:'date', type:'type', montant:'montant', motif:'motif', employe_id:'employeId', source:'source', vente_id:'venteId' },
   payroll_paiements: { id:'id', employe_id:'employeId', montant:'montant', date:'date', periode:'periode' },

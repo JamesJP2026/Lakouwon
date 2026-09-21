@@ -147,8 +147,16 @@ create table if not exists transferts (
   magasin_source_id uuid references magasins(id),
   magasin_dest_id uuid references magasins(id),
   items jsonb not null default '[]'::jsonb,
-  employe_id uuid references employes(id) on delete set null
+  employe_id uuid references employes(id) on delete set null,
+  statut text not null default 'en_transit' check (statut in ('en_transit','recu','annule')),
+  date_reception timestamptz,
+  confirme_par uuid references employes(id) on delete set null
 );
+-- Idempotent pour les bases déjà créées avant l'ajout du statut :
+alter table transferts add column if not exists statut text not null default 'en_transit' check (statut in ('en_transit','recu','annule'));
+alter table transferts add column if not exists date_reception timestamptz;
+alter table transferts add column if not exists confirme_par uuid references employes(id) on delete set null;
+create index if not exists idx_transferts_statut on transferts(magasin_dest_id, statut);
 
 -- ---------------------------------------------------------
 -- ACHATS (réapprovisionnement fournisseur)

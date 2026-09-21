@@ -473,23 +473,30 @@ export function renderRapport(ctx){
 export function renderTransfertsRoot(ctx){
   return ctx.transfertView==='nouveau' ? renderTransfertBuilder(ctx) : renderTransfertListe(ctx);
 }
+function transfertStatutBadge(t){
+  if(t.statut==='recu') return `<span class="badge cash">Reçu</span>`;
+  if(t.statut==='annule') return `<span class="badge" style="background:var(--red-bg);color:var(--red);">Annulé</span>`;
+  return `<span class="badge credit">En transit</span>`;
+}
 function renderTransfertListe(ctx){
   const { state } = ctx;
   const historique = state.transferts.slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
   return `
   <div class="topbar">
-    <div><h1>Transfert entre magasins</h1><p>Déplacez du stock d'un magasin vers un autre — comptabilisé des deux côtés</p></div>
+    <div><h1>Transfert entre magasins</h1><p>Le stock est retiré du magasin source à l'envoi, puis ajouté au magasin destinataire seulement après confirmation de réception</p></div>
     <div class="topbar-actions"><button class="btn btn-primary" id="btn-new-transfert" ${state.magasins.length<2?'disabled':''}>+ Nouveau transfert</button></div>
   </div>
   ${state.magasins.length<2? `<div class="empty">Il faut au moins deux magasins pour effectuer un transfert.</div>` : ''}
   <div class="table-wrap">
     <table>
-      <thead><tr><th>N°</th><th>Date</th><th>De</th><th>Vers</th><th>Articles</th><th class="right">Unités</th><th>Par</th></tr></thead>
+      <thead><tr><th>N°</th><th>Date</th><th>De</th><th>Vers</th><th>Articles</th><th class="right">Unités</th><th>Par</th><th>Statut</th><th></th></tr></thead>
       <tbody>
         ${historique.length? historique.map(t=>{
           const src = state.magasins.find(m=>m.id===t.magasinSourceId);
           const dst = state.magasins.find(m=>m.id===t.magasinDestId);
           const totalUnites = t.items.reduce((s,i)=>s+i.qte,0);
+          const peutConfirmer = t.statut==='en_transit' && state.currentMagasinId===t.magasinDestId;
+          const peutAnnuler = t.statut==='en_transit' && ctx.isAdminConnecte();
           return `<tr>
             <td><b>${t.numero}</b></td>
             <td class="muted">${new Date(t.date).toLocaleString('fr-FR')}</td>
@@ -498,8 +505,13 @@ function renderTransfertListe(ctx){
             <td class="muted">${t.items.map(i=>i.nom+' ×'+i.qte).join(', ')}</td>
             <td class="right num">${ctx.fmt(totalUnites)}</td>
             <td class="muted">${ctx.empName(t.employeId)}</td>
+            <td>${transfertStatutBadge(t)}${t.statut==='recu' && t.dateReception? `<div class="muted" style="font-size:11px; margin-top:3px;">${new Date(t.dateReception).toLocaleString('fr-FR')}</div>`:''}</td>
+            <td class="right">
+              ${peutConfirmer? `<button class="btn btn-sm btn-gold" data-confirmer-transfert="${t.id}">✔ Confirmer réception</button>`:''}
+              ${peutAnnuler? `<button class="btn btn-sm btn-danger" data-annuler-transfert="${t.id}">Annuler</button>`:''}
+            </td>
           </tr>`;
-        }).join('') : `<tr><td colspan="7" class="empty">Aucun transfert effectué.</td></tr>`}
+        }).join('') : `<tr><td colspan="9" class="empty">Aucun transfert effectué.</td></tr>`}
       </tbody>
     </table>
   </div>`;
@@ -1088,15 +1100,15 @@ function modalConfirmTransfert(ctx){
   const dst = state.magasins.find(m=>m.id===ctx.transfertDestId);
   const totalUnites = ctx.transfertCart.reduce((s,i)=>s+i.qte,0);
   return `<div class="overlay" id="overlay"><div class="modal">
-    <h2>Confirmer le transfert</h2>
+    <h2>Envoyer le transfert</h2>
     <div class="breakdown-row"><span>De</span><span><b>${src?src.nom:''}</b></span></div>
     <div class="breakdown-row"><span>Vers</span><span><b>${dst?dst.nom:''}</b></span></div>
     <div style="margin:12px 0; max-height:220px; overflow-y:auto;">
       ${ctx.transfertCart.map(i=>`<div class="alert-item"><span>${i.nom}</span><span class="num">${i.qte} unité(s)</span></div>`).join('')}
     </div>
     <div class="breakdown-row total"><span>Total</span><span class="num">${fmt(totalUnites)} unité(s)</span></div>
-    <div class="muted" style="font-size:12px; margin-top:6px;">Une fois validé, le stock sera retiré de "${src?src.nom:''}" et ajouté à "${dst?dst.nom:''}" immédiatement.</div>
-    <div class="modal-actions"><button class="btn" id="btn-cancel">Annuler</button><button class="btn btn-primary" id="btn-valider-transfert">✔ Valider le transfert</button></div>
+    <div class="muted" style="font-size:12px; margin-top:6px;">Une fois validé, le stock sera retiré de "${src?src.nom:''}" immédiatement (marqué « en transit »). Il ne sera ajouté à "${dst?dst.nom:''}" qu'après confirmation de réception depuis ce magasin.</div>
+    <div class="modal-actions"><button class="btn" id="btn-cancel">Annuler</button><button class="btn btn-primary" id="btn-valider-transfert">✔ Envoyer le transfert</button></div>
   </div></div>`;
 }
 

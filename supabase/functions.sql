@@ -406,12 +406,15 @@ end;
 $$;
 
 -- ---------------------------------------------------------
--- rpc_execute_transfert — déplace du stock entre deux magasins,
--- crée le produit côté destination si nécessaire (copie sa
--- config), en une seule transaction verrouillée.
+-- rpc_creer_transfert — Étape 1/2 : le magasin source envoie la
+-- marchandise. Le stock est retiré IMMÉDIATEMENT du magasin source
+-- (pour ne pas le revendre pendant qu'il est en route), mais rien
+-- n'est ajouté au magasin destinataire tant que celui-ci n'a pas
+-- confirmé la réception (rpc_confirmer_transfert). Le transfert est
+-- créé avec le statut 'en_transit'.
 -- p_items: [{"produit_id":"uuid","qte":n}]
 -- ---------------------------------------------------------
-create or replace function rpc_execute_transfert(p_source_id uuid, p_dest_id uuid, p_items jsonb)
+create or replace function rpc_creer_transfert(p_source_id uuid, p_dest_id uuid, p_items jsonb)
 returns transferts language plpgsql security definer set search_path = public as $$
 declare
   v_employe employes;
@@ -419,7 +422,6 @@ declare
   v_produit_id uuid;
   v_qte int;
   v_src produits;
-  v_dst_id uuid;
   v_stock_total int;
   v_caisses_needed int;
   v_reste_u int;
@@ -456,29 +458,101 @@ begin
       where id = v_produit_id;
     end if;
 
-    select id into v_dst_id from produits where magasin_id = p_dest_id and lower(nom) = lower(v_src.nom) limit 1 for update;
-    if v_dst_id is null then
-      insert into produits (magasin_id, nom, categorie, quantite_par_caisse, prix_achat, quantite_caisse,
-        quantite_detail, prix_vente_detail, lots, stock_initial, stock_minimum, archive)
-      values (p_dest_id, v_src.nom, v_src.categorie, v_src.quantite_par_caisse, v_src.prix_achat, 0,
-        v_qte, v_src.prix_vente_detail,
-        coalesce((select jsonb_agg(jsonb_build_object('id', gen_random_uuid(), 'taille', (l->>'taille')::int, 'prix', (l->>'prix')::numeric))
-           from jsonb_array_elements(v_src.lots) l), '[]'::jsonb),
-        0, v_src.stock_minimum, false);
-    else
-      update produits set quantite_detail = quantite_detail + v_qte where id = v_dst_id;
-    end if;
-
     v_items_out := v_items_out || jsonb_build_array(jsonb_build_object('produitId', v_produit_id, 'nom', v_src.nom, 'qte', v_qte));
   end loop;
 
-  insert into transferts (id, numero, date, magasin_source_id, magasin_dest_id, items, employe_id)
-  values (v_id, v_numero, now(), p_source_id, p_dest_id, v_items_out, v_employe.id);
+  insert into transferts (id, numero, date, magasin_source_id, magasin_dest_id, items, employe_id, statut)
+  values (v_id, v_numero, now(), p_source_id, p_dest_id, v_items_out, v_employe.id, 'en_transit');
 
   insert into journal (date, action, details, employe_id, magasin_id)
-  values (now(), 'Transfert ' || v_numero, (select nom from magasins where id = p_dest_id), v_employe.id, p_source_id);
+  values (now(), 'Transfert ' || v_numero || ' envoyé', 'vers ' || (select nom from magasins where id = p_dest_id) || ' — en attente de réception', v_employe.id, p_source_id);
 
   return (select t from transferts t where t.id = v_id);
+end;
+$$;
+
+-- ---------------------------------------------------------
+-- rpc_confirmer_transfert — Étape 2/2 : le magasin destinataire
+-- confirme avoir reçu la marchandise. Le stock est ajouté à ce
+-- moment-là seulement (crée le produit côté destination si besoin,
+-- en copiant sa config depuis le produit source).
+-- ---------------------------------------------------------
+create or replace function rpc_confirmer_transfert(p_transfert_id uuid)
+returns transferts language plpgsql security definer set search_path = public as $$
+declare
+  v_employe employes;
+  v_transfert transferts;
+  v_item jsonb;
+  v_produit_id uuid;
+  v_qte int;
+  v_src produits;
+  v_dst_id uuid;
+begin
+  v_employe := current_employe_row();
+  if v_employe.id is null then raise exception 'Employé non authentifié'; end if;
+  select * into v_transfert from transferts where id = p_transfert_id for update;
+  if not found then raise exception 'Transfert introuvable'; end if;
+  if not has_perm('transferts') then raise exception 'Permission refusée : transferts'; end if;
+  if v_transfert.statut <> 'en_transit' then raise exception 'Ce transfert n''est plus en attente de réception'; end if;
+
+  for v_item in select * from jsonb_array_elements(v_transfert.items) loop
+    v_produit_id := (v_item->>'produitId')::uuid;
+    v_qte := (v_item->>'qte')::int;
+    select * into v_src from produits where id = v_produit_id;
+
+    select id into v_dst_id from produits
+      where magasin_id = v_transfert.magasin_dest_id and lower(nom) = lower(v_item->>'nom') limit 1 for update;
+    if v_dst_id is null then
+      insert into produits (magasin_id, nom, categorie, quantite_par_caisse, prix_achat, quantite_caisse,
+        quantite_detail, prix_vente_detail, lots, stock_initial, stock_minimum, archive)
+      values (
+        v_transfert.magasin_dest_id, v_item->>'nom',
+        coalesce(v_src.categorie, ''), coalesce(v_src.quantite_par_caisse, 1), coalesce(v_src.prix_achat, 0), 0,
+        v_qte, coalesce(v_src.prix_vente_detail, 0),
+        coalesce((select jsonb_agg(jsonb_build_object('id', gen_random_uuid(), 'taille', (l->>'taille')::int, 'prix', (l->>'prix')::numeric))
+           from jsonb_array_elements(coalesce(v_src.lots,'[]'::jsonb)) l), '[]'::jsonb),
+        0, coalesce(v_src.stock_minimum, 0), false);
+    else
+      update produits set quantite_detail = quantite_detail + v_qte where id = v_dst_id;
+    end if;
+  end loop;
+
+  update transferts set statut = 'recu', date_reception = now(), confirme_par = v_employe.id
+  where id = p_transfert_id;
+
+  insert into journal (date, action, details, employe_id, magasin_id)
+  values (now(), 'Transfert ' || v_transfert.numero || ' reçu', 'confirmé par ' || v_employe.nom, v_employe.id, v_transfert.magasin_dest_id);
+
+  return (select t from transferts t where t.id = p_transfert_id);
+end;
+$$;
+
+-- ---------------------------------------------------------
+-- rpc_annuler_transfert — Admin uniquement. Annule un transfert
+-- encore en transit et restitue le stock au magasin source.
+-- ---------------------------------------------------------
+create or replace function rpc_annuler_transfert(p_transfert_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_employe employes;
+  v_transfert transferts;
+  v_item jsonb;
+begin
+  v_employe := current_employe_row();
+  if not is_admin() then raise exception 'Seul un administrateur peut annuler un transfert'; end if;
+  select * into v_transfert from transferts where id = p_transfert_id for update;
+  if not found then raise exception 'Transfert introuvable'; end if;
+  if v_transfert.statut <> 'en_transit' then raise exception 'Ce transfert n''est plus en attente de réception'; end if;
+
+  for v_item in select * from jsonb_array_elements(v_transfert.items) loop
+    update produits set quantite_detail = quantite_detail + (v_item->>'qte')::int
+    where id = (v_item->>'produitId')::uuid;
+  end loop;
+
+  update transferts set statut = 'annule' where id = p_transfert_id;
+
+  insert into journal (date, action, details, employe_id, magasin_id)
+  values (now(), 'Transfert ' || v_transfert.numero || ' annulé', 'stock restitué au magasin source', v_employe.id, v_transfert.magasin_source_id);
 end;
 $$;
 
@@ -576,6 +650,13 @@ $$;
 -- (RLS + vérifications internes restent l'unique barrière).
 grant execute on function
   rpc_finalize_sale, rpc_modifier_vente, rpc_delete_vente,
-  rpc_pay_client_debt, rpc_pay_vente, rpc_execute_transfert,
+  rpc_pay_client_debt, rpc_pay_vente,
+  rpc_creer_transfert, rpc_confirmer_transfert, rpc_annuler_transfert,
   rpc_add_achat, rpc_pay_salaire, rpc_auto_archive_produits_inactifs
 to authenticated;
+
+-- Si vous avez déjà exécuté une version précédente de ce fichier,
+-- l'ancienne fonction rpc_execute_transfert (remplacée par
+-- rpc_creer_transfert + rpc_confirmer_transfert ci-dessus) peut être
+-- supprimée sans risque :
+drop function if exists rpc_execute_transfert(uuid, uuid, jsonb);
