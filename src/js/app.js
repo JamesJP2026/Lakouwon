@@ -411,7 +411,19 @@ function attachSetupEvents(){
     if(pw.length<6){ loginError='Le mot de passe doit contenir au moins 6 caractères.'; render(); return; }
     busy = true; loginError=''; render();
 
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password: pw });
+    let { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password: pw });
+    if(signUpError && /already registered|already exists/i.test(signUpError.message||'')){
+      // Une tentative précédente a créé le compte Auth sans terminer l'insertion
+      // dans employes (ex: erreur réseau) — on retente une simple connexion.
+      const signInRes = await supabase.auth.signInWithPassword({ email, password: pw });
+      if(signInRes.error){
+        busy = false;
+        loginError = `Un compte existe déjà pour cet email mais avec un autre mot de passe. Supprimez-le dans Supabase (Authentication → Users → ${email} → Delete) puis recommencez.`;
+        render();
+        return;
+      }
+      signUpData = signInRes.data; signUpError = null;
+    }
     if(signUpError){ busy=false; loginError = friendlyError(signUpError); render(); return; }
     if(!signUpData.session){
       busy = false;
