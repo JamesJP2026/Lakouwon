@@ -174,6 +174,13 @@ function can(perm){
 }
 function showToast(msg){ toast = msg; render(); setTimeout(()=>{ toast=null; render(); }, 2600); }
 function friendlyError(err){ return (err && err.message) ? err.message : 'Une erreur est survenue'; }
+async function edgeFunctionErrorMessage(err){
+  try{
+    if(err?.context?.json){ const body = await err.context.json(); if(body?.error) return body.error; }
+    if(err?.context?.text){ const text = await err.context.text(); if(text) return text; }
+  }catch(e){}
+  return friendlyError(err);
+}
 
 /* =========================================================
    CHARGEMENT DES DONNÉES + TEMPS RÉEL
@@ -405,7 +412,7 @@ function attachSetupEvents(){
     busy = true; loginError=''; render();
     const { data, error } = await supabase.functions.invoke('admin-employee', { body:{ action:'bootstrap', nom, email, password:pw } });
     busy = false;
-    if(error || data?.error){ loginError = data?.error || friendlyError(error); render(); return; }
+    if(error || data?.error){ loginError = data?.error || await edgeFunctionErrorMessage(error); render(); return; }
     bootstrapNeeded = false;
     await doLogin(email, pw);
   };
@@ -563,7 +570,7 @@ function ctx(){
     get generatedPasswordPreview(){return generatedPasswordPreview;}, set generatedPasswordPreview(v){generatedPasswordPreview=v;},
     get changePwError(){return changePwError;}, set changePwError(v){changePwError=v;},
     get busy(){return busy;}, set busy(v){busy=v;},
-    render, showToast, askConfirm, logAction, friendlyError,
+    render, showToast, askConfirm, logAction, friendlyError, edgeFunctionErrorMessage,
     currentUser, isAdminConnecte, can, empName, clientName,
     magasinProduits, magasinProduitsActifs, magasinClients, magasinVentes, magasinCaisse, magasinEmployes,
     magasinProformas, magasinAchats, ventesPeriode, clientDette, totalDettesMagasin, valeurStock, soldeCaisse,
