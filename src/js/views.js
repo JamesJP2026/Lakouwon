@@ -4,6 +4,12 @@
    de contexte construit par app.js (état + helpers).
 ========================================================= */
 
+// Petite bulle d'aide (?) au survol, pour expliquer un champ sans
+// alourdir l'écran — utile pour former un nouvel employé.
+function aide(texte){
+  return `<span class="help-ic" title="${texte.replace(/"/g,'&quot;')}">?</span>`;
+}
+
 /* ---------- TABLEAU DE BORD ---------- */
 function ventesParMode(ctx){
   const groups = {};
@@ -153,7 +159,7 @@ export function renderVente(ctx){
           <button class="btn btn-sm btn-danger" data-remove="${idx}">✕</button>
         </div>`).join('') : `<div class="muted" style="padding:10px 0;">Le panier est vide.</div>`}
 
-      <div class="field" style="margin-top:12px;"><label>Remise / Rabais (optionnel)</label>
+      <div class="field" style="margin-top:12px;"><label>Remise / Rabais (optionnel)${aide("Réduit le total de la vente. Choisissez un montant fixe (ex: 50 HTG) ou un pourcentage (ex: 10%).")}</label>
         <div class="row2">
           <select id="remise-type">
             <option value="montant" ${ctx.posRemiseType==='montant'?'selected':''}>Montant fixe</option>
@@ -1020,8 +1026,8 @@ function modalProduit(ctx){
       </div>
     </div>
     <div class="row2">
-      <div class="field"><label>Quantité par caisse (unités)</label><input type="number" id="f-quantiteParCaisse" value="${p.quantiteParCaisse||1}" min="1"></div>
-      <div class="field"><label>Prix d'achat (par caisse)</label><input type="number" id="f-prixAchat" value="${p.prixAchat}" min="0"></div>
+      <div class="field"><label>Quantité par caisse (unités)${aide("Combien d'unités il y a dans une caisse/carton de ce produit. Ex: une caisse de 24 sodas → 24.")}</label><input type="number" id="f-quantiteParCaisse" value="${p.quantiteParCaisse||1}" min="1"></div>
+      <div class="field"><label>Prix d'achat (par caisse)${aide("Combien vous avez payé pour UNE caisse entière chez le fournisseur — pas le prix d'une seule unité.")}</label><input type="number" id="f-prixAchat" value="${p.prixAchat}" min="0"></div>
     </div>
     <div class="row2">
       <div class="field"><label>Quantité de caisses en stock</label><input type="number" id="f-quantiteCaisse" value="${p.quantiteCaisse||0}" min="0"></div>
@@ -1030,15 +1036,15 @@ function modalProduit(ctx){
       </div>
     </div>
     <div class="row2">
-      <div class="field"><label>Prix de vente en détail (par unité)</label><input type="number" id="f-prixVenteDetail" value="${p.prixVenteDetail}" min="0"></div>
-      <div class="field"><label>Prix de vente en gros (pour <span id="gros-qty-label">${p.quantiteParCaisse||1}</span> unité(s), soit 1 caisse)</label>
+      <div class="field"><label>Prix de vente en détail (par unité)${aide("Le prix auquel vous vendez UNE seule unité au client.")}</label><input type="number" id="f-prixVenteDetail" value="${p.prixVenteDetail}" min="0"></div>
+      <div class="field"><label>Prix de vente en gros (pour <span id="gros-qty-label">${p.quantiteParCaisse||1}</span> unité(s), soit 1 caisse)${aide("Optionnel : un prix spécial quand le client achète une caisse entière d'un coup, souvent moins cher qu'à l'unité.")}</label>
         <input type="number" id="f-prixVenteGros" min="0" value="${lotCaisse?lotCaisse.prix:''}" placeholder="Laisser vide si non applicable">
       </div>
     </div>
     <div class="info-box" id="live-info-box">${produitLiveInfoHTML(ctx, p.quantiteParCaisse||1, p.quantiteCaisse||0, p.quantiteDetail||0, p.prixAchat||0, p.prixVenteDetail||0)}</div>
 
     <div class="field">
-      <label>Autres tailles de lot (optionnel — ex: lot de 3, 12 unités)</label>
+      <label>Autres tailles de lot (optionnel — ex: lot de 3, 12 unités)${aide("D'autres formats de vente groupée en plus de la vente en gros par caisse, ex: un pack de 6.")}</label>
       <div id="lots-editor">${lotsEditorHTML(ctx, p)}</div>
       <button type="button" class="btn btn-sm" id="btn-add-lot-row">+ Ajouter un type de lot</button>
     </div>
@@ -1049,7 +1055,7 @@ function modalProduit(ctx){
              <button type="button" class="btn btn-sm" id="btn-recalc-stock-initial" style="margin-top:6px;">↻ Recalculer sur le stock actuel (${ctx.fmt(ctx.stockUnites(p))})</button>
            </div>`
         : `<div class="field"><label>Stock initial</label><input value="Calculé automatiquement à l'enregistrement" disabled></div>`}
-      <div class="field"><label>Stock minimum (alerte)</label><input type="number" id="f-stockMinimum" value="${p.stockMinimum||0}" min="0"></div>
+      <div class="field"><label>Stock minimum (alerte)${aide("En dessous de cette quantité, le produit apparaît dans les alertes de stock bas.")}</label><input type="number" id="f-stockMinimum" value="${p.stockMinimum||0}" min="0"></div>
     </div>
     <div class="modal-actions"><button class="btn" id="btn-cancel">Annuler</button><button class="btn btn-primary" id="btn-save-produit">Enregistrer</button></div>
   </div></div>`;
