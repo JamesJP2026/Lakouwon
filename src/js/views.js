@@ -85,9 +85,9 @@ export function renderDashboard(ctx){
     <div class="kpi"><div class="lbl">Chiffre d'affaires</div><div class="val num">${money(k.ca)}</div><div class="sub">${ctx.ventesPeriode().length} vente(s)</div></div>
     <div class="kpi gold"><div class="lbl">Marge brute</div><div class="val num">${money(k.margeBrute)}</div><div class="sub">${k.margePct.toFixed(1)}% de marge</div></div>
     <div class="kpi neg"><div class="lbl">Dépenses</div><div class="val num">${money(k.depenses)}</div><div class="sub">Sorties de caisse hors ventes</div></div>
-    <div class="kpi ${dettes>0?'neg':''}"><div class="lbl">Dettes clients</div><div class="val num">${money(dettes)}</div><div class="sub">Crédits non soldés</div></div>
-    <div class="kpi"><div class="lbl">Valeur du stock</div><div class="val num">${money(ctx.valeurStock())}</div><div class="sub">Au prix d'achat</div></div>
-    <div class="kpi ${ctx.soldeCaisse()<0?'neg':'pos'}"><div class="lbl">Solde caisse</div><div class="val num">${money(ctx.soldeCaisse())}</div><div class="sub">Espèces disponibles</div></div>
+    <div class="kpi white"><div class="lbl">Dettes clients</div><div class="val num">${money(dettes)}</div><div class="sub">Crédits non soldés</div></div>
+    <div class="kpi lime"><div class="lbl">Valeur du stock</div><div class="val num">${money(ctx.valeurStock())}</div><div class="sub">Au prix d'achat</div></div>
+    <div class="kpi ${ctx.soldeCaisse()<0?'neg':'lemon'}"><div class="lbl">Solde caisse</div><div class="val num">${money(ctx.soldeCaisse())}</div><div class="sub">Espèces disponibles</div></div>
   </div>
   <div class="panel">
     <h3>Pronostic — si tout le stock actuel était vendu au détail</h3>
