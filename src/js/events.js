@@ -327,7 +327,7 @@ export function attachAllEvents(ctx){
   document.querySelectorAll('[data-theme-navy]').forEach(b=>b.onclick = ()=> saveTheme(b.dataset.themeNavy, b.dataset.themeGold));
 
   const btnSaveSettings = document.getElementById('btn-save-settings');
-  if(btnSaveSettings) btnSaveSettings.onclick = async ()=>{
+  if(btnSaveSettings) btnSaveSettings.onclick = ()=> ctx.withBusyButton(btnSaveSettings, async ()=>{
     const nom_commerce = document.getElementById('set-nom').value || state.settings.nomCommerce;
     const adresse = document.getElementById('set-adresse').value.trim();
     const telephone = document.getElementById('set-telephone').value.trim();
@@ -338,7 +338,7 @@ export function attachAllEvents(ctx){
     Object.assign(state.settings, { nomCommerce:nom_commerce, adresse, telephone, email, devise });
     ctx.logAction('Paramètres modifiés','');
     ctx.showToast('Paramètres enregistrés'); ctx.render();
-  };
+  });
   const setLogo = document.getElementById('set-logo');
   if(setLogo) setLogo.onchange = e=>{
     const file = e.target.files[0]; if(!file) return;
@@ -534,7 +534,7 @@ export function attachAllEvents(ctx){
   }
 
   const btnSaveProduit = document.getElementById('btn-save-produit');
-  if(btnSaveProduit) btnSaveProduit.onclick = async ()=>{
+  if(btnSaveProduit) btnSaveProduit.onclick = ()=> ctx.withBusyButton(btnSaveProduit, async ()=>{
     const nom = document.getElementById('f-nom').value.trim();
     if(!nom){ ctx.showToast('Le nom du produit est requis'); return; }
     const catSelectVal = document.getElementById('f-categorie-select').value;
@@ -579,10 +579,10 @@ export function attachAllEvents(ctx){
       ctx.logAction('Produit ajouté', data.nom);
     }
     ctx.editing=null; ctx.render();
-  };
+  });
 
   const btnSaveClient = document.getElementById('btn-save-client');
-  if(btnSaveClient) btnSaveClient.onclick = async ()=>{
+  if(btnSaveClient) btnSaveClient.onclick = ()=> ctx.withBusyButton(btnSaveClient, async ()=>{
     const nom = document.getElementById('f-nom').value.trim();
     const telephone = document.getElementById('f-telephone').value.trim();
     if(!nom){ ctx.showToast('Le nom du client est requis'); return; }
@@ -598,7 +598,7 @@ export function attachAllEvents(ctx){
       ctx.logAction('Client ajouté', nom);
     }
     ctx.editing=null; ctx.render();
-  };
+  });
 
   document.querySelectorAll('[data-perm]').forEach(cb=>cb.onchange = ()=>{
     const key = cb.dataset.perm;
@@ -656,14 +656,14 @@ export function attachAllEvents(ctx){
   };
 
   const btnSavePaydette = document.getElementById('btn-save-paydette');
-  if(btnSavePaydette) btnSavePaydette.onclick = async ()=>{
+  if(btnSavePaydette) btnSavePaydette.onclick = ()=> ctx.withBusyButton(btnSavePaydette, async ()=>{
     const montant = parseFloat(document.getElementById('f-montant').value)||0;
     const mode = document.getElementById('f-mode').value;
     if(montant<=0){ ctx.showToast('Montant invalide'); return; }
     const { error } = await supabase.rpc('rpc_pay_client_debt', { p_client_id: ctx.editing.id, p_montant: montant, p_mode: mode });
     if(error){ ctx.showToast(ctx.friendlyError(error)); return; }
     ctx.editing=null; ctx.showToast('Paiement enregistré'); ctx.render();
-  };
+  });
 
   const btnSavePaysalaire = document.getElementById('btn-save-paysalaire');
   if(btnSavePaysalaire) btnSavePaysalaire.onclick = async ()=>{

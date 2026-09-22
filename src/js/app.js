@@ -41,6 +41,24 @@ const fmt = n => (Number(n)||0).toLocaleString('fr-FR',{maximumFractionDigits:2}
 const money = n => fmt(n) + ' ' + (state.settings.devise||'HTG');
 const nowStr = () => new Date().toLocaleString('fr-FR');
 
+// Désactive un bouton et affiche un indicateur clair pendant une action
+// asynchrone, pour éviter les doubles clics (double vente, double
+// enregistrement...). Le bouton retrouve son état normal une fois terminé.
+async function withBusyButton(btn, fn){
+  if(!btn || btn.dataset.busy==='1') return;
+  btn.dataset.busy = '1';
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<span class="btn-spinner"></span> ${original}`;
+  try{
+    await fn();
+  } finally {
+    btn.dataset.busy = '';
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }
+}
+
 function coutUnitaire(p){ const qpc = p.quantiteParCaisse>0? p.quantiteParCaisse : 1; return (p.prixAchat||0)/qpc; }
 function stockUnites(p){ return (p.quantiteCaisse||0)*(p.quantiteParCaisse||1) + (p.quantiteDetail||0); }
 function margePct(prixVente, cout){ return cout>0 ? ((prixVente-cout)/cout*100) : 0; }
@@ -759,6 +777,7 @@ function ctx(){
     upsertRow, removeRow, mapRow,
     get offlineMode(){return offlineMode;},
     isNetworkError, queueOfflineSale, loadOfflineQueue, saveOfflineQueue, persistOfflineCache, syncOfflineQueue,
+    withBusyButton,
   };
 }
 
