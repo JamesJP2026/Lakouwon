@@ -280,6 +280,37 @@ async function logAction(action, details){
 }
 
 /* =========================================================
+   PANIER DE VENTE PERSISTANT — pour ne pas perdre une vente en
+   cours si la page se ferme/rafraîchit par accident (coupure de
+   courant, onglet fermé par erreur...).
+========================================================= */
+const CART_DRAFT_KEY = 'lakouwon_cart_draft_v1';
+function persistCartDraft(){
+  try{
+    if(editingVenteId){ return; } // ne jamais écraser une modification de fiche en cours
+    if(!cart || cart.length===0){ localStorage.removeItem(CART_DRAFT_KEY); return; }
+    localStorage.setItem(CART_DRAFT_KEY, JSON.stringify({
+      cart, posClientId, posPayMode, posDepositMode, posMontantRecu, posRemiseType, posRemiseValeur, posEncaissementPartiel,
+      magasinId: state.currentMagasinId, savedAt: Date.now(),
+    }));
+  }catch(e){}
+}
+function restoreCartDraft(){
+  try{
+    const raw = localStorage.getItem(CART_DRAFT_KEY);
+    if(!raw) return;
+    const d = JSON.parse(raw);
+    if(!d || !Array.isArray(d.cart) || d.cart.length===0) return;
+    if(d.magasinId && d.magasinId !== state.currentMagasinId) return;
+    cart = d.cart;
+    posClientId = d.posClientId||''; posPayMode = d.posPayMode||'cash'; posDepositMode = d.posDepositMode||'cash';
+    posMontantRecu = d.posMontantRecu||0; posRemiseType = d.posRemiseType||'montant'; posRemiseValeur = d.posRemiseValeur||0;
+    posEncaissementPartiel = !!d.posEncaissementPartiel;
+    showToast('Panier en cours restauré (vente inachevée précédemment)');
+  }catch(e){}
+}
+
+/* =========================================================
    MODE HORS-LIGNE — l'appareil garde en mémoire (localStorage)
    les dernières données reçues du serveur, pour pouvoir afficher
    l'application et continuer à vendre même sans connexion. Les
@@ -429,6 +460,7 @@ async function bootAfterAuth(withLoad=true){
     if(withLoad) await loadAllData();
     subscribeRealtime();
     logAction('Connexion', currentUser()?.nom||'');
+    restoreCartDraft();
   }
   render();
 }
@@ -471,6 +503,7 @@ function render(){
   const app = document.getElementById('app');
   if(bootstrapNeeded){ app.innerHTML = renderSetup(); attachSetupEvents(); return; }
   if(!loginState.loggedIn){ app.innerHTML = renderLogin(); attachLoginEvents(); return; }
+  persistCartDraft();
   app.innerHTML = `
     ${renderSidebar()}
     <div class="main">
@@ -746,6 +779,7 @@ async function boot(){
         const ok = await loadAllData();
         if(ok) subscribeRealtime();
         else if(tryRestoreOfflineCache()) offlineMode = true;
+        restoreCartDraft();
       }
       else { await loadPublicBranding(); }
     }
