@@ -614,6 +614,10 @@ function ctx(){
   };
 }
 
+document.addEventListener('wheel', ()=>{
+  if(document.activeElement && document.activeElement.type==='number') document.activeElement.blur();
+}, { passive:true });
+
 /* =========================================================
    DÉMARRAGE
 ========================================================= */
