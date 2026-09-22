@@ -118,11 +118,24 @@ export function attachAllEvents(ctx){
   const btnValiderVente = document.getElementById('btn-valider-vente'); if(btnValiderVente) btnValiderVente.onclick = ()=> finalizeSale(ctx, ctx.posMontantRecu);
 
   /* ---------------- Fiches ---------------- */
-  const ficheSearchInp = document.getElementById('fiche-search');
-  if(ficheSearchInp) ficheSearchInp.oninput = e=>{
-    ctx.ficheSearch = e.target.value;
+  const refreshFichesTable = ()=>{
     const wrap = document.getElementById('fiches-table-wrap');
     if(wrap){ wrap.innerHTML = fichesTableHTML(ctx); attachFichesTableEvents(ctx); }
+  };
+  const ficheSearchInp = document.getElementById('fiche-search');
+  if(ficheSearchInp) ficheSearchInp.oninput = e=>{ ctx.ficheSearch = e.target.value; refreshFichesTable(); };
+  const ficheDateDebutInp = document.getElementById('fiche-filtre-date-debut');
+  if(ficheDateDebutInp) ficheDateDebutInp.onchange = e=>{ ctx.ficheFiltreDateDebut = e.target.value; refreshFichesTable(); };
+  const ficheDateFinInp = document.getElementById('fiche-filtre-date-fin');
+  if(ficheDateFinInp) ficheDateFinInp.onchange = e=>{ ctx.ficheFiltreDateFin = e.target.value; refreshFichesTable(); };
+  const ficheModeInp = document.getElementById('fiche-filtre-mode');
+  if(ficheModeInp) ficheModeInp.onchange = e=>{ ctx.ficheFiltreMode = e.target.value; refreshFichesTable(); };
+  const ficheEmployeInp = document.getElementById('fiche-filtre-employe');
+  if(ficheEmployeInp) ficheEmployeInp.onchange = e=>{ ctx.ficheFiltreEmployeId = e.target.value; refreshFichesTable(); };
+  const btnResetFiltresFiches = document.getElementById('btn-reset-filtres-fiches');
+  if(btnResetFiltresFiches) btnResetFiltresFiches.onclick = ()=>{
+    ctx.ficheSearch=''; ctx.ficheFiltreDateDebut=''; ctx.ficheFiltreDateFin=''; ctx.ficheFiltreMode=''; ctx.ficheFiltreEmployeId='';
+    ctx.render();
   };
   attachFichesTableEvents(ctx);
   const btnPayVente = document.getElementById('btn-pay-vente'); if(btnPayVente) btnPayVente.onclick = ()=>{ ctx.editing={type:'payVente', id:ctx.editing.id}; ctx.render(); };
@@ -233,6 +246,12 @@ export function attachAllEvents(ctx){
 
   /* ---------------- Historique des achats ---------------- */
   const btnNewAchat = document.getElementById('btn-new-achat'); if(btnNewAchat) btnNewAchat.onclick = ()=>{ ctx.editing={type:'achat'}; ctx.render(); };
+  const achatDateDebutInp = document.getElementById('achat-filtre-date-debut');
+  if(achatDateDebutInp) achatDateDebutInp.onchange = e=>{ ctx.achatFiltreDateDebut = e.target.value; ctx.render(); };
+  const achatDateFinInp = document.getElementById('achat-filtre-date-fin');
+  if(achatDateFinInp) achatDateFinInp.onchange = e=>{ ctx.achatFiltreDateFin = e.target.value; ctx.render(); };
+  const btnResetFiltresAchats = document.getElementById('btn-reset-filtres-achats');
+  if(btnResetFiltresAchats) btnResetFiltresAchats.onclick = ()=>{ ctx.achatFiltreDateDebut=''; ctx.achatFiltreDateFin=''; ctx.render(); };
   document.querySelectorAll('[data-del-achat]').forEach(b=>b.onclick = ()=>{
     ctx.askConfirm("Supprimer cet achat de l'historique ? (le stock déjà ajouté ne sera pas retiré automatiquement)", async ()=>{
       const { error } = await supabase.from('achats').delete().eq('id', b.dataset.delAchat);

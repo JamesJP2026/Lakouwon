@@ -221,6 +221,16 @@ export function fichesFiltrees(ctx){
     const q = ctx.ficheSearch.toLowerCase();
     ventes = ventes.filter(v=> v.numero.toLowerCase().includes(q) || ctx.clientName(v.clientId).toLowerCase().includes(q));
   }
+  if(ctx.ficheFiltreDateDebut){
+    const debut = new Date(ctx.ficheFiltreDateDebut); debut.setHours(0,0,0,0);
+    ventes = ventes.filter(v=> new Date(v.date) >= debut);
+  }
+  if(ctx.ficheFiltreDateFin){
+    const fin = new Date(ctx.ficheFiltreDateFin); fin.setHours(23,59,59,999);
+    ventes = ventes.filter(v=> new Date(v.date) <= fin);
+  }
+  if(ctx.ficheFiltreMode) ventes = ventes.filter(v=> v.modePaiement === ctx.ficheFiltreMode);
+  if(ctx.ficheFiltreEmployeId) ventes = ventes.filter(v=> v.employeId === ctx.ficheFiltreEmployeId);
   return ventes;
 }
 export function fichesTableHTML(ctx){
@@ -248,9 +258,34 @@ export function fichesTableHTML(ctx){
     </table>`;
 }
 export function renderFiches(ctx){
+  const employes = ctx.magasinEmployes();
   return `
   <div class="topbar"><div><h1>Fiches de vente</h1><p>Consultez et vérifiez le détail de chaque vente</p></div></div>
-  <input class="search" id="fiche-search" placeholder="🔎 Rechercher par numéro ou client..." value="${ctx.ficheSearch}" style="margin-bottom:14px; width:280px;">
+  <div class="panel" style="padding:14px 16px; margin-bottom:14px;">
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+      <div class="field" style="margin:0; min-width:200px; flex:1;"><label>Recherche</label>
+        <input class="search" id="fiche-search" placeholder="🔎 Numéro ou client..." value="${ctx.ficheSearch}" style="width:100%;">
+      </div>
+      <div class="field" style="margin:0;"><label>Du</label><input type="date" id="fiche-filtre-date-debut" value="${ctx.ficheFiltreDateDebut}"></div>
+      <div class="field" style="margin:0;"><label>Au</label><input type="date" id="fiche-filtre-date-fin" value="${ctx.ficheFiltreDateFin}"></div>
+      <div class="field" style="margin:0;"><label>Mode de paiement</label>
+        <select id="fiche-filtre-mode">
+          <option value="">Tous</option>
+          <option value="cash" ${ctx.ficheFiltreMode==='cash'?'selected':''}>Cash</option>
+          <option value="banque" ${ctx.ficheFiltreMode==='banque'?'selected':''}>Banque</option>
+          <option value="moncash" ${ctx.ficheFiltreMode==='moncash'?'selected':''}>MonCash</option>
+          <option value="credit" ${ctx.ficheFiltreMode==='credit'?'selected':''}>Crédit</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0;"><label>Employé</label>
+        <select id="fiche-filtre-employe">
+          <option value="">Tous</option>
+          ${employes.map(e=>`<option value="${e.id}" ${ctx.ficheFiltreEmployeId===e.id?'selected':''}>${e.nom}</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn btn-sm" id="btn-reset-filtres-fiches">✕ Réinitialiser</button>
+    </div>
+  </div>
   <div class="table-wrap" id="fiches-table-wrap">
     ${fichesTableHTML(ctx)}
   </div>`;
@@ -564,12 +599,27 @@ function renderTransfertBuilder(ctx){
 /* ---------- HISTORIQUE DES ACHATS ---------- */
 export function renderAchats(ctx){
   const { money, fmt } = ctx;
-  const achats = ctx.magasinAchats();
+  let achats = ctx.magasinAchats();
+  if(ctx.achatFiltreDateDebut){
+    const debut = new Date(ctx.achatFiltreDateDebut); debut.setHours(0,0,0,0);
+    achats = achats.filter(a=> new Date(a.date) >= debut);
+  }
+  if(ctx.achatFiltreDateFin){
+    const fin = new Date(ctx.achatFiltreDateFin); fin.setHours(23,59,59,999);
+    achats = achats.filter(a=> new Date(a.date) <= fin);
+  }
   const totalGeneral = achats.reduce((s,a)=>s+a.prixTotal,0);
   return `
   <div class="topbar">
     <div><h1>Historique des achats</h1><p>Suivi des réapprovisionnements et achats fournisseurs</p></div>
     <div class="topbar-actions"><button class="btn btn-primary" id="btn-new-achat">+ Nouvel achat</button></div>
+  </div>
+  <div class="panel" style="padding:14px 16px; margin-bottom:14px;">
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+      <div class="field" style="margin:0;"><label>Du</label><input type="date" id="achat-filtre-date-debut" value="${ctx.achatFiltreDateDebut}"></div>
+      <div class="field" style="margin:0;"><label>Au</label><input type="date" id="achat-filtre-date-fin" value="${ctx.achatFiltreDateFin}"></div>
+      <button class="btn btn-sm" id="btn-reset-filtres-achats">✕ Réinitialiser</button>
+    </div>
   </div>
   <div class="kpi-row">
     <div class="kpi"><div class="lbl">Total des achats enregistrés</div><div class="val num">${money(totalGeneral)}</div></div>
