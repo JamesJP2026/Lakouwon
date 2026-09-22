@@ -35,9 +35,23 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+function readInjectedKey(jsonVarName: string, legacyVarName: string): string {
+  const raw = Deno.env.get(jsonVarName);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      const value = parsed?.default;
+      if (value) return value;
+    } catch {
+      // pas du JSON (ancien format) : on retombe sur la variable historique ci-dessous
+    }
+  }
+  return Deno.env.get(legacyVarName)!;
+}
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const SERVICE_ROLE_KEY = readInjectedKey("SUPABASE_SECRET_KEYS", "SUPABASE_SERVICE_ROLE_KEY");
+const ANON_KEY = readInjectedKey("SUPABASE_PUBLISHABLE_KEYS", "SUPABASE_ANON_KEY");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
