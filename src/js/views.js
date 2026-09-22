@@ -307,7 +307,11 @@ export function renderProduits(ctx){
   return `
   <div class="topbar">
     <div><h1>Produits & Stock</h1><p>Gérez votre inventaire, vos prix détail et gros</p></div>
-    <div class="topbar-actions"><button class="btn btn-primary" id="btn-new-produit">+ Nouveau produit</button></div>
+    <div class="topbar-actions">
+      <button class="btn btn-sm btn-gold" id="btn-export-stock-csv">📤 Excel (sauvegarde)</button>
+      <button class="btn btn-sm btn-gold" id="btn-export-stock-pdf">📄 PDF</button>
+      <button class="btn btn-primary" id="btn-new-produit">+ Nouveau produit</button>
+    </div>
   </div>
   <div class="period-tabs">
     <button class="period-tab ${ctx.produitsFiltre==='actifs'?'active':''}" data-produits-filtre="actifs">Actifs</button>
@@ -346,6 +350,134 @@ export function renderProduits(ctx){
       </div>`;
     }).join('') : `<div class="empty" style="grid-column:1/-1;">Aucun produit dans cette catégorie.</div>`}
   </div>`;
+}
+
+// Page imprimable (utilisée aussi pour "Enregistrer en PDF" via l'impression
+// du navigateur) listant tout le stock actuel — pour une sauvegarde papier
+// ou numérique indépendante de l'application.
+export function generateStockPrintHTML(ctx){
+  const { money, fmt, state } = ctx;
+  const magasin = state.magasins.find(m=>m.id===state.currentMagasinId);
+  const produits = ctx.magasinProduitsActifs().slice().sort((a,b)=>a.nom.localeCompare(b.nom));
+  const valeurTotale = produits.reduce((s,p)=>s+(ctx.stockUnites(p)*ctx.coutUnitaire(p)),0);
+  return `
+    <div style="font-family:'Inter',Arial,sans-serif;">
+      <h2 style="margin-bottom:2px;">${state.settings.nomCommerce} — État du stock</h2>
+      <div style="color:#666; font-size:12px; margin-bottom:14px;">${magasin?magasin.nom:''} — ${new Date().toLocaleString('fr-FR')}</div>
+      <table style="width:100%; border-collapse:collapse; font-size:12px;">
+        <thead><tr>
+          <th style="text-align:left; border-bottom:2px solid #333; padding:5px;">Produit</th>
+          <th style="text-align:left; border-bottom:2px solid #333; padding:5px;">Catégorie</th>
+          <th style="text-align:right; border-bottom:2px solid #333; padding:5px;">Stock (unités)</th>
+          <th style="text-align:right; border-bottom:2px solid #333; padding:5px;">Prix d'achat (caisse)</th>
+          <th style="text-align:right; border-bottom:2px solid #333; padding:5px;">Valeur (achat)</th>
+        </tr></thead>
+        <tbody>
+          ${produits.map(p=>`<tr>
+            <td style="padding:5px; border-bottom:1px solid #ddd;">${p.nom}</td>
+            <td style="padding:5px; border-bottom:1px solid #ddd;">${p.categorie||'—'}</td>
+            <td style="padding:5px; border-bottom:1px solid #ddd; text-align:right;">${fmt(ctx.stockUnites(p))}</td>
+            <td style="padding:5px; border-bottom:1px solid #ddd; text-align:right;">${money(p.prixAchat)}</td>
+            <td style="padding:5px; border-bottom:1px solid #ddd; text-align:right;">${money(ctx.stockUnites(p)*ctx.coutUnitaire(p))}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      <div style="text-align:right; font-weight:800; margin-top:10px; font-size:13px;">Valeur totale du stock : ${money(valeurTotale)}</div>
+    </div>`;
+}
+
+/* ---------- INVENTAIRE PHYSIQUE ---------- */
+function inventaireProduits(ctx){
+  let produits = ctx.magasinProduitsActifs().slice().sort((a,b)=>a.nom.localeCompare(b.nom));
+  if(ctx.inventaireSearch){
+    const q = ctx.inventaireSearch.toLowerCase();
+    produits = produits.filter(p=> p.nom.toLowerCase().includes(q) || (p.categorie||'').toLowerCase().includes(q));
+  }
+  return produits;
+}
+
+function inventaireRowHTML(ctx, p){
+  const { fmt } = ctx;
+  const systeme = ctx.stockUnites(p);
+  const compteRaw = ctx.inventaireComptages[p.id];
+  const compte = (compteRaw===''||compteRaw===undefined||compteRaw===null) ? null : parseInt(compteRaw)||0;
+  const ecart = compte===null ? null : compte - systeme;
+  return `<tr data-inv-row="${p.id}">
+    <td><b>${p.nom}</b></td>
+    <td class="muted">${p.categorie||'—'}</td>
+    <td class="right num">${fmt(systeme)}</td>
+    <td class="right"><input type="number" min="0" style="width:90px; text-align:right;" data-inv-input="${p.id}" value="${compteRaw??''}" placeholder="—"></td>
+    <td class="right num" data-inv-ecart="${p.id}" style="${ecart>0?'color:var(--green);font-weight:700;':ecart<0?'color:var(--red);font-weight:700;':''}">${ecart===null?'—':(ecart>0?'+':'')+fmt(ecart)}</td>
+  </tr>`;
+}
+
+export function renderInventaire(ctx){
+  const produits = inventaireProduits(ctx);
+  const comptages = ctx.inventaireComptages;
+  const nbComptes = Object.keys(comptages).filter(id=>comptages[id]!==''&&comptages[id]!==undefined&&comptages[id]!==null).length;
+  return `
+  <div class="topbar">
+    <div><h1>Inventaire physique</h1><p>Comptez le stock réel de chaque produit et comparez-le au stock système</p></div>
+    <div class="topbar-actions">
+      <button class="btn btn-sm" id="btn-export-inventaire-csv">📤 Excel</button>
+      <button class="btn btn-sm" id="btn-export-inventaire-pdf">📄 PDF</button>
+      ${ctx.isAdminConnecte()? `<button class="btn btn-primary" id="btn-appliquer-inventaire">✔ Appliquer au stock</button>` : ''}
+    </div>
+  </div>
+  <div class="info-box">Entrez la quantité réellement comptée pour chaque produit (en unités, pas en caisses). L'écart s'affiche automatiquement. ${nbComptes>0?`<b>${nbComptes} produit(s) compté(s)</b> — sauvegardé automatiquement si la page se ferme.`:''}</div>
+  <div class="toolbar">
+    <input class="search" id="inventaire-search" placeholder="🔎 Rechercher un produit ou une catégorie..." value="${ctx.inventaireSearch}">
+    <button class="btn btn-sm" id="btn-reset-inventaire">✕ Réinitialiser le comptage</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Produit</th><th>Catégorie</th><th class="right">Stock système</th><th class="right">Quantité comptée</th><th class="right">Écart</th></tr></thead>
+      <tbody id="inventaire-tbody">
+        ${produits.length? produits.map(p=>inventaireRowHTML(ctx,p)).join('') : `<tr><td colspan="5" class="empty">Aucun produit.</td></tr>`}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+// Page imprimable de la feuille d'inventaire (avec les quantités comptées
+// jusqu'à présent), pour "Enregistrer en PDF" via l'impression du navigateur.
+export function generateInventairePrintHTML(ctx){
+  const { fmt, state } = ctx;
+  const magasin = state.magasins.find(m=>m.id===state.currentMagasinId);
+  const produits = inventaireProduits(ctx);
+  return `
+    <div style="font-family:'Inter',Arial,sans-serif;">
+      <h2 style="margin-bottom:2px;">${state.settings.nomCommerce} — Inventaire physique</h2>
+      <div style="color:#666; font-size:12px; margin-bottom:14px;">${magasin?magasin.nom:''} — ${new Date().toLocaleString('fr-FR')}</div>
+      <table style="width:100%; border-collapse:collapse; font-size:12px;">
+        <thead><tr>
+          <th style="text-align:left; border-bottom:2px solid #333; padding:5px;">Produit</th>
+          <th style="text-align:left; border-bottom:2px solid #333; padding:5px;">Catégorie</th>
+          <th style="text-align:right; border-bottom:2px solid #333; padding:5px;">Stock système</th>
+          <th style="text-align:right; border-bottom:2px solid #333; padding:5px;">Compté</th>
+          <th style="text-align:right; border-bottom:2px solid #333; padding:5px;">Écart</th>
+        </tr></thead>
+        <tbody>
+          ${produits.map(p=>{
+            const systeme = ctx.stockUnites(p);
+            const compteRaw = ctx.inventaireComptages[p.id];
+            const compte = (compteRaw===''||compteRaw===undefined||compteRaw===null) ? null : parseInt(compteRaw)||0;
+            const ecart = compte===null ? null : compte - systeme;
+            return `<tr>
+              <td style="padding:5px; border-bottom:1px solid #ddd;">${p.nom}</td>
+              <td style="padding:5px; border-bottom:1px solid #ddd;">${p.categorie||'—'}</td>
+              <td style="padding:5px; border-bottom:1px solid #ddd; text-align:right;">${fmt(systeme)}</td>
+              <td style="padding:5px; border-bottom:1px solid #ddd; text-align:right;">${compte===null?'________':fmt(compte)}</td>
+              <td style="padding:5px; border-bottom:1px solid #ddd; text-align:right;">${ecart===null?'':(ecart>0?'+':'')+fmt(ecart)}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      <div style="margin-top:30px; font-size:12px; display:flex; justify-content:space-between;">
+        <div>Compté par : ________________________</div>
+        <div>Signature : ________________________</div>
+      </div>
+    </div>`;
 }
 
 /* ---------- CLIENTS & DETTES ---------- */

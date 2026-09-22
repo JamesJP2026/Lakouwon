@@ -175,6 +175,8 @@ let ficheFiltreMode = '';
 let ficheFiltreEmployeId = '';
 let achatFiltreDateDebut = '';
 let achatFiltreDateFin = '';
+let inventaireSearch = '';
+let inventaireComptages = {};
 let productLotsDraft = [];
 let permissionsDraft = [];
 let dashboardSearchQuery = '';
@@ -336,6 +338,30 @@ function restoreCartDraft(){
 }
 
 /* =========================================================
+   INVENTAIRE PHYSIQUE — comptage en cours conservé par magasin
+   pour ne pas perdre le travail en cas de fermeture accidentelle.
+========================================================= */
+const INVENTAIRE_DRAFT_KEY = 'lakouwon_inventaire_draft_v1';
+function persistInventaireDraft(){
+  try{
+    const cle = Object.keys(inventaireComptages).length;
+    if(!cle){ localStorage.removeItem(INVENTAIRE_DRAFT_KEY); return; }
+    localStorage.setItem(INVENTAIRE_DRAFT_KEY, JSON.stringify({
+      magasinId: state.currentMagasinId, comptages: inventaireComptages, savedAt: Date.now(),
+    }));
+  }catch(e){}
+}
+function restoreInventaireDraft(){
+  try{
+    const raw = localStorage.getItem(INVENTAIRE_DRAFT_KEY);
+    if(!raw) return;
+    const d = JSON.parse(raw);
+    if(!d || d.magasinId !== state.currentMagasinId || !d.comptages) return;
+    inventaireComptages = d.comptages;
+  }catch(e){}
+}
+
+/* =========================================================
    MODE HORS-LIGNE — l'appareil garde en mémoire (localStorage)
    les dernières données reçues du serveur, pour pouvoir afficher
    l'application et continuer à vendre même sans connexion. Les
@@ -486,6 +512,7 @@ async function bootAfterAuth(withLoad=true){
     subscribeRealtime();
     logAction('Connexion', currentUser()?.nom||'');
     restoreCartDraft();
+    restoreInventaireDraft();
   }
   render();
 }
@@ -662,10 +689,10 @@ function renderSidebar(){
   const sections = [
     {label:null, items:[['dashboard','📊','Tableau de bord']]},
     {label:'Ventes', items:[['vente','🛒','Nouvelle vente'],['fiches','🧾','Fiches de vente'],['proforma','📄','Proforma']]},
-    {label:'Stock', items:[['produits','📦','Produits & Stock'],['transferts','🔄','Transfert entre magasins'],['achats','📥','Historique des achats']]},
+    {label:'Stock', items:[['produits','📦','Produits & Stock'],['inventaire','📋','Inventaire physique','produits'],['transferts','🔄','Transfert entre magasins'],['achats','📥','Historique des achats']]},
     {label:'Finances', items:[['clients','👥','Clients & Dettes'],['caisse','💵','Caisse'],['depenses','💸','Dépenses'],['rapport','📅','Rapport journalier']]},
     {label:'Administration', items:[['employes','🧑‍💼','Employés & Paie'],['journal','📜','Journal'],['parametres','⚙️','Paramètres']]},
-  ].map(s=>({...s, items:s.items.filter(l=>can(l[0]))})).filter(s=>s.items.length>0);
+  ].map(s=>({...s, items:s.items.filter(l=>can(l[3]||l[0]))})).filter(s=>s.items.length>0);
   const stockBasCount = magasinProduitsActifs().filter(p=>stockUnites(p) <= (p.stockMinimum||0)).length;
   return `
   <div class="sidebar ${mobileSidebarOpen?'open':''}" id="sidebar">
@@ -692,7 +719,7 @@ function renderSidebar(){
 
 function renderView(){
   const fns = {dashboard:renderDashboard, vente:renderVente, fiches:renderFiches, proforma:renderProforma,
-    produits:renderProduits, clients:renderClients, caisse:renderCaisse, depenses:renderDepenses, rapport:renderRapport,
+    produits:renderProduits, inventaire:renderInventaire, clients:renderClients, caisse:renderCaisse, depenses:renderDepenses, rapport:renderRapport,
     transferts:renderTransfertsRoot, achats:renderAchats, employes:renderEmployes, journal:renderJournal, parametres:renderParametres};
   return fns[view] ? fns[view](ctx()) : '';
 }
@@ -736,7 +763,7 @@ function joursDepuisDerniereVente(produitId){
 }
 
 import { attachAllEvents } from "./events.js";
-import { renderDashboard, renderVente, renderFiches, renderProforma, renderProduits, renderClients, renderCaisse,
+import { renderDashboard, renderVente, renderFiches, renderProforma, renderProduits, renderInventaire, renderClients, renderCaisse,
   renderDepenses, renderRapport, renderTransfertsRoot, renderAchats, renderEmployes, renderJournal, renderParametres,
   renderModal, generateReceiptHTML, generateProformaHTML } from "./views.js";
 
@@ -791,6 +818,9 @@ function ctx(){
     get ficheFiltreEmployeId(){return ficheFiltreEmployeId;}, set ficheFiltreEmployeId(v){ficheFiltreEmployeId=v;},
     get achatFiltreDateDebut(){return achatFiltreDateDebut;}, set achatFiltreDateDebut(v){achatFiltreDateDebut=v;},
     get achatFiltreDateFin(){return achatFiltreDateFin;}, set achatFiltreDateFin(v){achatFiltreDateFin=v;},
+    get inventaireSearch(){return inventaireSearch;}, set inventaireSearch(v){inventaireSearch=v;},
+    get inventaireComptages(){return inventaireComptages;}, set inventaireComptages(v){inventaireComptages=v;},
+    persistInventaireDraft,
     get productLotsDraft(){return productLotsDraft;}, set productLotsDraft(v){productLotsDraft=v;},
     get permissionsDraft(){return permissionsDraft;}, set permissionsDraft(v){permissionsDraft=v;},
     get dashboardSearchQuery(){return dashboardSearchQuery;}, set dashboardSearchQuery(v){dashboardSearchQuery=v;},
@@ -840,6 +870,7 @@ async function boot(){
         if(ok) subscribeRealtime();
         else if(tryRestoreOfflineCache()) offlineMode = true;
         restoreCartDraft();
+        restoreInventaireDraft();
       }
       else { await loadPublicBranding(); }
     }

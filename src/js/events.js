@@ -7,7 +7,8 @@
 ========================================================= */
 import { fichesTableHTML, searchFichesEtProformas, renderSearchResults, todayISOLocal,
   lotsEditorHTML, produitLiveInfoHTML, lotMarginText, cvDynamicHTML, cvValiderDisabled,
-  fichesFiltrees, achatsFiltres, rapportDuJour } from "./views.js";
+  fichesFiltrees, achatsFiltres, rapportDuJour,
+  generateStockPrintHTML, generateInventairePrintHTML } from "./views.js";
 
 export function attachAllEvents(ctx){
   const { state, supabase } = ctx;
@@ -194,6 +195,15 @@ export function attachAllEvents(ctx){
     const q = produitsSearch.value.toLowerCase();
     document.querySelectorAll('#product-grid .product-card').forEach(c=>{ c.style.display = c.dataset.name.includes(q) ? '' : 'none'; });
   };
+  const btnExportStockCsv = document.getElementById('btn-export-stock-csv');
+  if(btnExportStockCsv) btnExportStockCsv.onclick = ()=>{
+    ctx.exportCSV('stock.csv',
+      ['Produit','Catégorie','Stock (unités)','Prix d\'achat (caisse)','Prix vente détail','Valeur (achat)'],
+      ctx.magasinProduitsActifs().map(p=>[p.nom, p.categorie||'', ctx.stockUnites(p), p.prixAchat, p.prixVenteDetail, (ctx.stockUnites(p)*ctx.coutUnitaire(p)).toFixed(2)])
+    );
+  };
+  const btnExportStockPdf = document.getElementById('btn-export-stock-pdf');
+  if(btnExportStockPdf) btnExportStockPdf.onclick = ()=>{ ctx.editing = {type:'receiptPreview', html: generateStockPrintHTML(ctx)}; ctx.render(); };
   const btnNewProduit = document.getElementById('btn-new-produit'); if(btnNewProduit) btnNewProduit.onclick = ()=>{ ctx.productLotsDraft=[]; ctx.editing={type:'produit', id:null}; ctx.render(); };
   document.querySelectorAll('[data-edit-produit]').forEach(b=>b.onclick = ()=>{
     const prod = state.produits.find(x=>x.id===b.dataset.editProduit);
@@ -221,6 +231,76 @@ export function attachAllEvents(ctx){
       ctx.logAction('Produit supprimé', p.nom); ctx.render();
     });
   });
+
+  /* ---------------- Inventaire physique ---------------- */
+  const inventaireSearchInp = document.getElementById('inventaire-search');
+  if(inventaireSearchInp) inventaireSearchInp.oninput = e=>{ ctx.inventaireSearch = e.target.value; ctx.render(); };
+  document.querySelectorAll('[data-inv-input]').forEach(inp=>inp.oninput = ()=>{
+    const id = inp.dataset.invInput;
+    ctx.inventaireComptages[id] = inp.value;
+    ctx.persistInventaireDraft();
+    const p = state.produits.find(x=>x.id===id);
+    const systeme = ctx.stockUnites(p);
+    const compte = inp.value===''? null : parseInt(inp.value)||0;
+    const ecart = compte===null? null : compte - systeme;
+    const ecartCell = document.querySelector(`[data-inv-ecart="${id}"]`);
+    if(ecartCell){
+      ecartCell.textContent = ecart===null?'—':(ecart>0?'+':'')+ctx.fmt(ecart);
+      ecartCell.style.color = ecart>0?'var(--green)':ecart<0?'var(--red)':'';
+      ecartCell.style.fontWeight = ecart? '700':'';
+    }
+  });
+  const btnResetInventaire = document.getElementById('btn-reset-inventaire');
+  if(btnResetInventaire) btnResetInventaire.onclick = ()=>{
+    ctx.askConfirm('Effacer tout le comptage en cours ?', ()=>{
+      ctx.inventaireComptages = {};
+      ctx.persistInventaireDraft();
+      ctx.render();
+    });
+  };
+  const btnExportInventaireCsv = document.getElementById('btn-export-inventaire-csv');
+  if(btnExportInventaireCsv) btnExportInventaireCsv.onclick = ()=>{
+    const produits = ctx.magasinProduitsActifs();
+    ctx.exportCSV('inventaire-physique.csv',
+      ['Produit','Catégorie','Stock système','Compté','Écart'],
+      produits.map(p=>{
+        const raw = ctx.inventaireComptages[p.id];
+        const compte = (raw===''||raw===undefined||raw===null)? '' : parseInt(raw)||0;
+        const systeme = ctx.stockUnites(p);
+        const ecart = compte===''? '' : compte - systeme;
+        return [p.nom, p.categorie||'', systeme, compte, ecart];
+      })
+    );
+  };
+  const btnExportInventairePdf = document.getElementById('btn-export-inventaire-pdf');
+  if(btnExportInventairePdf) btnExportInventairePdf.onclick = ()=>{ ctx.editing = {type:'receiptPreview', html: generateInventairePrintHTML(ctx)}; ctx.render(); };
+  const btnAppliquerInventaire = document.getElementById('btn-appliquer-inventaire');
+  if(btnAppliquerInventaire) btnAppliquerInventaire.onclick = ()=>{
+    const produits = ctx.magasinProduitsActifs();
+    const aAppliquer = produits.filter(p=>{
+      const raw = ctx.inventaireComptages[p.id];
+      return raw!==''&&raw!==undefined&&raw!==null;
+    });
+    if(aAppliquer.length===0){ ctx.showToast('Aucune quantité comptée à appliquer'); return; }
+    ctx.askConfirm(`Mettre à jour le stock de ${aAppliquer.length} produit(s) selon le comptage ? Cette action est irréversible et remplace le stock système actuel. À faire de préférence quand les ventes sont arrêtées, pour éviter d'écraser une vente en cours ailleurs.`, async ()=>{
+      let ok = 0, echecs = 0;
+      for(const p of aAppliquer){
+        const compte = Math.max(0, parseInt(ctx.inventaireComptages[p.id])||0);
+        const qpc = Math.max(p.quantiteParCaisse||1, 1);
+        const quantiteCaisse = Math.floor(compte / qpc);
+        const quantiteDetail = compte % qpc;
+        const { error } = await supabase.from('produits').update({ quantite_caisse: quantiteCaisse, quantite_detail: quantiteDetail }).eq('id', p.id);
+        if(error){ echecs++; continue; }
+        p.quantiteCaisse = quantiteCaisse; p.quantiteDetail = quantiteDetail;
+        ok++;
+      }
+      await ctx.logAction('Inventaire physique appliqué', `${ok} produit(s) ajusté(s)${echecs?`, ${echecs} échec(s)`:''}`);
+      ctx.inventaireComptages = {};
+      ctx.persistInventaireDraft();
+      ctx.showToast(`Stock mis à jour pour ${ok} produit(s)${echecs?` (${echecs} échec(s))`:''}`);
+      ctx.render();
+    });
+  };
 
   /* ---------------- Clients ---------------- */
   const btnNewClient = document.getElementById('btn-new-client'); if(btnNewClient) btnNewClient.onclick = ()=>{ ctx.editing={type:'client', id:null}; ctx.render(); };
