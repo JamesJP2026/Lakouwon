@@ -209,6 +209,8 @@ function friendlyError(err){
 async function edgeFunctionErrorMessage(err){
   try{
     if(err?.context?.json){ const body = await err.context.json(); if(body?.error) return body.error; }
+  }catch(e){}
+  try{
     if(err?.context?.text){ const text = await err.context.text(); if(text) return text; }
   }catch(e){}
   return friendlyError(err);
