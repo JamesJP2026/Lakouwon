@@ -175,7 +175,10 @@ function can(perm){
   return perms.includes(perm);
 }
 function showToast(msg){ toast = msg; render(); setTimeout(()=>{ toast=null; render(); }, 2600); }
-function friendlyError(err){ return (err && err.message) ? err.message : 'Une erreur est survenue'; }
+function friendlyError(err){
+  if(isNetworkError(err)) return "Pas de connexion internet — cette action a échoué. Réessayez une fois la connexion rétablie.";
+  return (err && err.message) ? err.message : 'Une erreur est survenue';
+}
 async function edgeFunctionErrorMessage(err){
   try{
     if(err?.context?.json){ const body = await err.context.json(); if(body?.error) return body.error; }
@@ -191,7 +194,8 @@ const DATA_TABLES = ['magasins','employes','produits','clients','ventes','profor
 let realtimeChannel = null;
 
 async function loadAllData(){
-  const { data: settingsRow } = await supabase.from('settings').select('*').eq('id',1).maybeSingle();
+  const { data: settingsRow, error: settingsError } = await supabase.from('settings').select('*').eq('id',1).maybeSingle();
+  if(settingsError && isNetworkError(settingsError)) return false;
   if(settingsRow) state.settings = mapRow('settings', settingsRow);
 
   for(const table of DATA_TABLES){
@@ -213,6 +217,8 @@ async function loadAllData(){
   }
   applyTheme();
   supabase.rpc('rpc_auto_archive_produits_inactifs').then(({error})=>{ if(error) console.warn(error.message); });
+  persistOfflineCache();
+  return true;
 }
 
 function subscribeRealtime(){
@@ -243,6 +249,7 @@ function applyRealtimeEvent(table, payload){
   }
   if(table==='ventes') state.ventes.sort((a,b)=>new Date(b.date)-new Date(a.date));
   if(table==='journal') state.journal.sort((a,b)=>new Date(b.date)-new Date(a.date));
+  persistOfflineCache();
   render();
 }
 
@@ -250,15 +257,17 @@ function upsertRow(table, row){
   if(!row) return null;
   const key = TABLE_TO_STATE_KEY[table];
   const mapped = mapRow(table, row);
-  if(key==='settings'){ state.settings = mapped; return mapped; }
+  if(key==='settings'){ state.settings = mapped; persistOfflineCache(); return mapped; }
   const arr = state[key];
   const idx = arr.findIndex(x=>x.id===mapped.id);
   if(idx>=0) arr[idx] = mapped; else arr.push(mapped);
+  persistOfflineCache();
   return mapped;
 }
 function removeRow(table, id){
   const key = TABLE_TO_STATE_KEY[table];
   state[key] = state[key].filter(x=>x.id!==id);
+  persistOfflineCache();
 }
 
 async function logAction(action, details){
@@ -271,12 +280,104 @@ async function logAction(action, details){
 }
 
 /* =========================================================
+   MODE HORS-LIGNE — l'appareil garde en mémoire (localStorage)
+   les dernières données reçues du serveur, pour pouvoir afficher
+   l'application et continuer à vendre même sans connexion. Les
+   ventes faites hors-ligne sont mises en file d'attente et
+   envoyées automatiquement au retour de la connexion (voir
+   finalizeSale/syncOfflineQueue dans events.js et plus bas).
+   Les autres actions (produits, transferts, employés...) restent
+   en ligne uniquement : trop risqué à rejouer sans savoir si
+   l'état côté serveur a changé entre-temps.
+========================================================= */
+const OFFLINE_CACHE_KEY = 'lakouwon_offline_cache_v1';
+const OFFLINE_QUEUE_KEY = 'lakouwon_offline_queue_v1';
+let offlineMode = !navigator.onLine;
+
+function isNetworkError(err){
+  if(!err) return false;
+  if(!navigator.onLine) return true;
+  const msg = ((err.message||'')+'').toLowerCase();
+  return msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load failed') || msg.includes('network request failed');
+}
+
+function persistOfflineCache(){
+  try{
+    localStorage.setItem(OFFLINE_CACHE_KEY, JSON.stringify({ state, cachedAt: Date.now() }));
+  }catch(e){ /* stockage plein ou indisponible : tant pis, pas critique */ }
+}
+function tryRestoreOfflineCache(){
+  try{
+    const raw = localStorage.getItem(OFFLINE_CACHE_KEY);
+    if(!raw) return false;
+    const parsed = JSON.parse(raw);
+    if(!parsed || !parsed.state) return false;
+    state = parsed.state;
+    return true;
+  }catch(e){ return false; }
+}
+
+function loadOfflineQueue(){
+  try{ return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]'); }catch(e){ return []; }
+}
+function saveOfflineQueue(queue){
+  try{ localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue)); }catch(e){}
+}
+function queueOfflineSale(clientRef, params){
+  const queue = loadOfflineQueue();
+  queue.push({ clientRef, params, queuedAt: Date.now() });
+  saveOfflineQueue(queue);
+  persistOfflineCache();
+}
+
+async function syncOfflineQueue(){
+  const queue = loadOfflineQueue();
+  if(queue.length===0) return;
+  const remaining = [];
+  let synced = 0, failed = 0;
+  for(const item of queue){
+    const result = await supabase.rpc('rpc_finalize_sale', item.params);
+    if(result.error){
+      if(isNetworkError(result.error)){ remaining.push(item); continue; }
+      remaining.push({...item, failed:true, errorMessage: friendlyError(result.error)});
+      failed++;
+      continue;
+    }
+    removeRow('ventes', item.clientRef);
+    upsertRow('ventes', result.data);
+    synced++;
+  }
+  saveOfflineQueue(remaining);
+  if(synced>0) showToast(`${synced} vente(s) hors-ligne synchronisée(s) avec succès.`);
+  if(failed>0) showToast(`⚠ ${failed} vente(s) hors-ligne n'ont pas pu être synchronisées (voir Paramètres) — vérifiez le stock concerné.`);
+  persistOfflineCache();
+  render();
+}
+
+function setupConnectivityListeners(){
+  window.addEventListener('offline', ()=>{ offlineMode = true; render(); });
+  window.addEventListener('online', async ()=>{
+    offlineMode = false;
+    render();
+    if(!loginState.loggedIn) return;
+    try{ await loadAllData(); subscribeRealtime(); }catch(e){ /* on retentera au prochain événement online */ }
+    await syncOfflineQueue();
+  });
+}
+
+/* =========================================================
    AUTHENTIFICATION
 ========================================================= */
 async function refreshEmployeFromSession(){
   const { data: { session } } = await supabase.auth.getSession();
   if(!session){ loginState.loggedIn = false; return; }
   const { data: emp, error } = await supabase.from('employes').select('*').eq('auth_user_id', session.user.id).maybeSingle();
+  if(error && isNetworkError(error)){
+    // Hors-ligne au démarrage : on garde la session ouverte, l'employé et le
+    // reste des données seront repris du cache local par loadAllData().
+    loginState.loggedIn = true;
+    return;
+  }
   if(error || !emp || !emp.actif){
     await supabase.auth.signOut();
     loginState.loggedIn = false;
@@ -473,6 +574,20 @@ function attachLoginEvents(){
   const pwInp = document.getElementById('login-password'); if(pwInp) pwInp.onkeydown = e=>{ if(e.key==='Enter') submit(); };
 }
 
+function connectivityBannerHTML(){
+  const isOffline = offlineMode || !navigator.onLine;
+  const pending = loadOfflineQueue().length;
+  if(!isOffline && pending===0) return '';
+  if(isOffline){
+    return `<div style="margin:0 16px 10px; padding:8px 10px; border-radius:8px; background:var(--red-bg); color:var(--red); font-size:12px; font-weight:700;">
+      🔴 Hors ligne${pending>0? ` — ${pending} vente(s) en attente d'envoi` : ' — les ventes seront synchronisées au retour d\'internet'}
+    </div>`;
+  }
+  return `<div style="margin:0 16px 10px; padding:8px 10px; border-radius:8px; background:var(--amber-bg); color:var(--amber); font-size:12px; font-weight:700;">
+    🟡 Synchronisation de ${pending} vente(s) en cours...
+  </div>`;
+}
+
 function renderSidebar(){
   const u = currentUser();
   const links = [
@@ -501,6 +616,7 @@ function renderSidebar(){
       <select id="sel-magasin">${state.magasins.map(m=>`<option value="${m.id}" ${m.id===state.currentMagasinId?'selected':''}>${m.nom}</option>`).join('')}</select>
     </div>
     <nav class="navlinks">${links.map(([id,ic,label])=>`<button class="navlink ${view===id?'active':''}" data-view="${id}"><span class="ic">${ic}</span>${label}</button>`).join('')}</nav>
+    ${connectivityBannerHTML()}
     <div class="sidebar-foot">
       Connecté : <b>${u?u.nom:''}</b><br>${u?u.role:''}
       ${u && u.role==='Admin' ? `<button class="btn btn-sm" id="btn-change-password" style="width:100%; justify-content:center; margin-top:10px;">🔑 Changer mon mot de passe</button>` : ''}
@@ -611,6 +727,8 @@ function ctx(){
     fmt, money, nowStr, uid, applyTheme, shadeColor, THEME_PRESETS, PERMS_ALL, PERMS_LABELS, PERMS_PRESETS,
     SEUIL_ARCHIVAGE_JOURS, periodBounds, printReceipt, printProforma, doLogout,
     upsertRow, removeRow, mapRow,
+    get offlineMode(){return offlineMode;},
+    isNetworkError, queueOfflineSale, loadOfflineQueue, saveOfflineQueue, persistOfflineCache, syncOfflineQueue,
   };
 }
 
@@ -622,11 +740,23 @@ document.addEventListener('wheel', ()=>{
    DÉMARRAGE
 ========================================================= */
 async function boot(){
-  await checkBootstrapNeeded();
-  if(!bootstrapNeeded){
-    await refreshEmployeFromSession();
-    if(loginState.loggedIn){ await loadAllData(); subscribeRealtime(); }
-    else { await loadPublicBranding(); }
+  setupConnectivityListeners();
+  try{
+    await checkBootstrapNeeded();
+    if(!bootstrapNeeded){
+      await refreshEmployeFromSession();
+      if(loginState.loggedIn){
+        const ok = await loadAllData();
+        if(ok) subscribeRealtime();
+        else if(tryRestoreOfflineCache()) offlineMode = true;
+      }
+      else { await loadPublicBranding(); }
+    }
+  }catch(e){
+    // Démarrage hors-ligne inattendu (ex: session expirée sans réseau pour la
+    // renouveler) : on tente de retomber sur les dernières données connues
+    // plutôt que de laisser l'application planter sur un écran vide.
+    if(tryRestoreOfflineCache()){ offlineMode = true; loginState.loggedIn = true; }
   }
   render();
 

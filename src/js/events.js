@@ -306,6 +306,12 @@ export function attachAllEvents(ctx){
   });
 
   /* ---------------- Paramètres ---------------- */
+  const btnRetryOfflineSync = document.getElementById('btn-retry-offline-sync');
+  if(btnRetryOfflineSync) btnRetryOfflineSync.onclick = async ()=>{
+    if(!navigator.onLine){ ctx.showToast('Toujours hors-ligne — réessayez une fois la connexion internet rétablie.'); return; }
+    await ctx.syncOfflineQueue();
+  };
+
   async function saveTheme(navy, gold){
     const { error } = await supabase.from('settings').update({ couleur_primaire: navy, couleur_accent: gold }).eq('id',1);
     if(error){ ctx.showToast(ctx.friendlyError(error)); return; }
@@ -778,26 +784,105 @@ function addLotToCart(ctx, prodId, lotId){
 async function finalizeSale(ctx, montantRecuConfirme){
   if(ctx.cart.length===0 || ctx.busy) return;
   ctx.busy = true; ctx.render();
-  const items = ctx.cart.map(i=>({ produit_id: i.produitId, mode: i.mode, lot_id: i.lotId||null, qte: i.qte }));
+  const cartSnapshot = ctx.cart.map(i=>({...i}));
+  const items = cartSnapshot.map(i=>({ produit_id: i.produitId, mode: i.mode, lot_id: i.lotId||null, qte: i.qte }));
   const params = {
     p_items: items, p_remise_type: ctx.posRemiseType, p_remise_valeur: ctx.posRemiseValeur,
     p_mode_paiement: ctx.posDepositMode, p_montant_recu: Math.max(0, montantRecuConfirme||0),
     p_encaissement_partiel: ctx.posEncaissementPartiel, p_client_id: ctx.posClientId || null,
   };
-  let result;
+
+  // La modification d'une fiche existante nécessite toujours une connexion :
+  // trop risqué de la rejouer hors-ligne sans savoir si elle a déjà changé
+  // ailleurs entre-temps (paiement partiel reçu, correction par un admin...).
   if(ctx.editingVenteId){
-    result = await ctx.supabase.rpc('rpc_modifier_vente', { p_vente_id: ctx.editingVenteId, ...params });
-  } else {
-    result = await ctx.supabase.rpc('rpc_finalize_sale', { p_magasin_id: ctx.state.currentMagasinId, ...params });
+    const result = await ctx.supabase.rpc('rpc_modifier_vente', { p_vente_id: ctx.editingVenteId, ...params });
+    ctx.busy = false;
+    if(result.error){ ctx.showToast(ctx.friendlyError(result.error)); ctx.render(); return; }
+    const vente = ctx.upsertRow('ventes', result.data);
+    ctx.editingVenteId = null; ctx.editingVenteNumero = null;
+    ctx.cart = []; ctx.posPayMode='cash'; ctx.posClientId=''; ctx.posDepositMode='cash'; ctx.posMontantRecu=0; ctx.posRemiseType='montant'; ctx.posRemiseValeur=0;
+    ctx.showToast('Fiche modifiée avec succès');
+    ctx.printReceipt(vente);
+    return;
   }
+
+  const clientRef = ctx.uid() + '-' + Date.now();
+  const finalizeParams = { p_magasin_id: ctx.state.currentMagasinId, ...params, p_client_ref: clientRef };
+  const tryOnline = navigator.onLine;
+  const result = tryOnline
+    ? await ctx.supabase.rpc('rpc_finalize_sale', finalizeParams)
+    : { error: { message: 'Hors ligne' } };
+
+  if(!tryOnline || ctx.isNetworkError(result.error)){
+    ctx.busy = false;
+    const vente = registerOfflineSale(ctx, clientRef, finalizeParams, cartSnapshot, params);
+    ctx.cart = []; ctx.posPayMode='cash'; ctx.posClientId=''; ctx.posDepositMode='cash'; ctx.posMontantRecu=0; ctx.posRemiseType='montant'; ctx.posRemiseValeur=0;
+    ctx.showToast("Pas de connexion — vente enregistrée hors-ligne, elle sera envoyée automatiquement au retour d'internet.");
+    ctx.printReceipt(vente);
+    return;
+  }
+
   ctx.busy = false;
   if(result.error){ ctx.showToast(ctx.friendlyError(result.error)); ctx.render(); return; }
   const vente = ctx.upsertRow('ventes', result.data);
-  const etaitModification = !!ctx.editingVenteId;
-  ctx.editingVenteId = null; ctx.editingVenteNumero = null;
   ctx.cart = []; ctx.posPayMode='cash'; ctx.posClientId=''; ctx.posDepositMode='cash'; ctx.posMontantRecu=0; ctx.posRemiseType='montant'; ctx.posRemiseValeur=0;
-  ctx.showToast(etaitModification? 'Fiche modifiée avec succès' : 'Vente enregistrée avec succès');
+  ctx.showToast('Vente enregistrée avec succès');
   ctx.printReceipt(vente);
+}
+
+// Construit une vente "locale" optimiste pendant une coupure internet, et la
+// place dans la file d'attente hors-ligne pour un envoi automatique dès que
+// la connexion revient (voir syncOfflineQueue dans app.js).
+function registerOfflineSale(ctx, clientRef, finalizeParams, cartSnapshot, params){
+  const totalBrut = ctx.cartTotal(cartSnapshot);
+  const remise = ctx.remiseMontant(totalBrut);
+  const total = Math.max(0, totalBrut - remise);
+  const coutTotal = ctx.cartCost(cartSnapshot);
+  const montantRecu = params.p_montant_recu;
+  const reste = params.p_encaissement_partiel ? Math.max(0, total - montantRecu) : 0;
+  const montantPaye = total - reste;
+  const monnaieRendue = Math.max(0, montantRecu - total);
+  const modeFinal = reste > 0 ? 'credit' : params.p_mode_paiement;
+  const u = ctx.currentUser();
+  const venteLocale = {
+    id: clientRef,
+    numero: 'HL-' + clientRef.slice(-8).toUpperCase(),
+    magasinId: ctx.state.currentMagasinId,
+    date: new Date().toISOString(),
+    items: cartSnapshot.map(i=>({ produitId:i.produitId, nom:i.nom, mode:i.mode, qte:i.qte, uniteParLot:i.uniteParLot||1, prixVente:i.prixVente, coutUnitaire:i.coutUnitaire })),
+    totalBrut, remise, total, coutTotal,
+    modePaiement: modeFinal, montantRecu, monnaieRendue, montantPaye, reste,
+    clientId: params.p_client_id || null,
+    employeId: u ? u.id : null,
+    paiements: [],
+    clientRef,
+    pendingSync: true,
+  };
+  ctx.state.ventes.unshift(venteLocale);
+  decrementStockLocalement(ctx, cartSnapshot);
+  ctx.queueOfflineSale(clientRef, finalizeParams);
+  return venteLocale;
+}
+
+// Déduit le stock localement, en reproduisant la même logique caisse/détail
+// que la fonction serveur rpc_finalize_sale, pour éviter de survendre le
+// même produit deux fois sur cet appareil pendant la coupure.
+function decrementStockLocalement(ctx, cartItems){
+  for(const item of cartItems){
+    const p = ctx.state.produits.find(x=>x.id===item.produitId);
+    if(!p) continue;
+    const unitsNeeded = item.qte * (item.uniteParLot||1);
+    if((p.quantiteDetail||0) >= unitsNeeded){
+      p.quantiteDetail -= unitsNeeded;
+    } else {
+      const resteU = unitsNeeded - (p.quantiteDetail||0);
+      const qpc = Math.max(p.quantiteParCaisse||1, 1);
+      const caissesNeeded = Math.ceil(resteU / qpc);
+      p.quantiteCaisse = (p.quantiteCaisse||0) - caissesNeeded;
+      p.quantiteDetail = (caissesNeeded * qpc) - resteU;
+    }
+  }
 }
 
 function commencerModificationVente(ctx, venteId){

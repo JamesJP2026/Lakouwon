@@ -27,11 +27,13 @@ create or replace function rpc_finalize_sale(
   p_mode_paiement text,
   p_montant_recu numeric,
   p_encaissement_partiel boolean,
-  p_client_id uuid
+  p_client_id uuid,
+  p_client_ref text default null
 ) returns ventes
 language plpgsql security definer set search_path = public as $$
 declare
   v_employe employes;
+  v_existing ventes;
   v_item jsonb;
   v_produit produits;
   v_lot jsonb;
@@ -61,6 +63,14 @@ begin
   if v_employe.id is null then raise exception 'Employé non authentifié ou inactif'; end if;
   if not has_perm('vente') then raise exception 'Permission refusée : vente'; end if;
   if p_items is null or jsonb_array_length(p_items) = 0 then raise exception 'Le panier est vide'; end if;
+
+  -- Rejeu idempotent : si cette vente hors-ligne a déjà été synchronisée
+  -- (ex: connexion coupée juste après la réponse du serveur), on renvoie
+  -- simplement la vente existante au lieu de déduire le stock une seconde fois.
+  if p_client_ref is not null then
+    select * into v_existing from ventes where client_ref = p_client_ref;
+    if found then return v_existing; end if;
+  end if;
 
   for v_item in select * from jsonb_array_elements(p_items) loop
     v_produit_id := (v_item->>'produit_id')::uuid;
@@ -124,11 +134,11 @@ begin
   v_vente_id := gen_random_uuid();
 
   insert into ventes (id, numero, magasin_id, date, items, total_brut, remise, total, cout_total,
-    mode_paiement, montant_recu, monnaie_rendue, montant_paye, reste, client_id, employe_id, paiements)
+    mode_paiement, montant_recu, monnaie_rendue, montant_paye, reste, client_id, employe_id, paiements, client_ref)
   values (v_vente_id, v_numero, p_magasin_id, now(), v_items_out, v_total_brut, v_remise, v_total, v_cout_total,
     v_mode_final, p_montant_recu, v_monnaie, v_montant_paye, v_reste,
     case when v_reste > 0 or p_client_id is not null then p_client_id else null end,
-    v_employe.id, '[]'::jsonb);
+    v_employe.id, '[]'::jsonb, p_client_ref);
 
   if p_mode_paiement = 'cash' then
     if p_montant_recu > 0 then

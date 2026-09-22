@@ -125,8 +125,15 @@ create table if not exists ventes (
   client_id uuid references clients(id) on delete set null,
   employe_id uuid references employes(id) on delete set null,
   paiements jsonb not null default '[]'::jsonb,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  client_ref text
 );
+-- Idempotent pour les bases déjà créées avant l'ajout du mode hors-ligne :
+-- `client_ref` est une référence générée par l'appareil au moment de la
+-- vente hors-ligne, pour éviter d'enregistrer deux fois la même vente si la
+-- synchronisation est relancée (perte de connexion pendant l'envoi, etc.).
+alter table ventes add column if not exists client_ref text;
+create unique index if not exists idx_ventes_client_ref on ventes(client_ref) where client_ref is not null;
 create index if not exists idx_ventes_magasin on ventes(magasin_id);
 create index if not exists idx_ventes_client on ventes(client_id) where client_id is not null;
 create index if not exists idx_ventes_date on ventes(date desc);

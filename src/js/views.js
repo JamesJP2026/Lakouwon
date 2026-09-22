@@ -232,7 +232,7 @@ export function fichesTableHTML(ctx){
       <tbody>
         ${ventes.length? ventes.map(v=>`
           <tr>
-            <td><b>${v.numero}</b></td>
+            <td><b>${v.numero}</b>${v.pendingSync? ' <span class="tag low" title="Faite hors-ligne, en attente d\'envoi au serveur">⏳ hors-ligne</span>' : ''}</td>
             <td class="muted">${new Date(v.date).toLocaleString('fr-FR')}</td>
             <td>${v.clientId? ctx.clientName(v.clientId) : '<span class="muted">Comptant</span>'}</td>
             <td><span class="badge ${v.modePaiement}">${v.modePaiement}</span></td>
@@ -241,7 +241,7 @@ export function fichesTableHTML(ctx){
             <td class="right num" style="${v.reste>0?'color:var(--red);font-weight:700;':''}">${money(v.reste)}</td>
             <td class="right">
               <button class="btn btn-sm" data-voir-vente="${v.id}">Voir</button>
-              ${ctx.isAdminConnecte()? `<button class="btn btn-sm btn-gold" data-modifier-vente="${v.id}">Modifier</button><button class="btn btn-sm btn-danger" data-suppr-vente="${v.id}">Suppr.</button>` : ''}
+              ${ctx.isAdminConnecte() && !v.pendingSync? `<button class="btn btn-sm btn-gold" data-modifier-vente="${v.id}">Modifier</button><button class="btn btn-sm btn-danger" data-suppr-vente="${v.id}">Suppr.</button>` : ''}
             </td>
           </tr>`).join('') : `<tr><td colspan="8" class="empty">Aucune vente enregistrée.</td></tr>`}
       </tbody>
@@ -649,8 +649,18 @@ export function renderJournal(ctx){
 export function renderParametres(ctx){
   const { state } = ctx;
   const s = state.settings;
+  const queue = ctx.loadOfflineQueue();
   return `
   <div class="topbar"><div><h1>Paramètres</h1><p>Personnalisez votre système</p></div></div>
+
+  ${queue.length? `<div class="panel" style="max-width:560px;">
+    <h3>Ventes hors-ligne en attente</h3>
+    <p class="muted" style="margin-top:-6px; font-size:12.5px;">Ventes faites pendant une coupure internet, pas encore confirmées par le serveur.</p>
+    ${queue.map(item=>`<div class="alert-item">
+      <span>${item.failed? `⚠ Échec — ${item.errorMessage||'erreur inconnue'}` : '⏳ En attente d\'envoi'}</span>
+    </div>`).join('')}
+    <button class="btn btn-primary" id="btn-retry-offline-sync" style="margin-top:10px;">🔄 Réessayer maintenant</button>
+  </div>` : ''}
 
   <div class="panel" style="max-width:560px;">
     <h3>Apparence</h3>
