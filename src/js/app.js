@@ -651,6 +651,7 @@ function renderSidebar(){
     {label:'Finances', items:[['clients','👥','Clients & Dettes'],['caisse','💵','Caisse'],['depenses','💸','Dépenses'],['rapport','📅','Rapport journalier']]},
     {label:'Administration', items:[['employes','🧑‍💼','Employés & Paie'],['journal','📜','Journal'],['parametres','⚙️','Paramètres']]},
   ].map(s=>({...s, items:s.items.filter(l=>can(l[0]))})).filter(s=>s.items.length>0);
+  const stockBasCount = magasinProduitsActifs().filter(p=>stockUnites(p) <= (p.stockMinimum||0)).length;
   return `
   <div class="sidebar">
     <div class="brand">
@@ -662,7 +663,7 @@ function renderSidebar(){
     </div>
     <nav class="navlinks">${sections.map(s=>`
       ${s.label? `<div class="navsection-label">${s.label}</div>` : ''}
-      ${s.items.map(([id,ic,label])=>`<button class="navlink ${view===id?'active':''}" data-view="${id}"><span class="ic">${ic}</span>${label}</button>`).join('')}
+      ${s.items.map(([id,ic,label])=>`<button class="navlink ${view===id?'active':''}" data-view="${id}"><span class="ic">${ic}</span>${label}${id==='produits' && stockBasCount>0 ? `<span class="navlink-badge">${stockBasCount}</span>` : ''}</button>`).join('')}
     `).join('')}</nav>
     ${connectivityBannerHTML()}
     <div class="sidebar-foot">
