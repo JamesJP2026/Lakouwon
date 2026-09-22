@@ -186,6 +186,7 @@ let transfertDestId = '';
 let transfertCart = [];
 let produitsFiltre = 'actifs';
 let toast = null;
+let mobileSidebarOpen = false;
 let editingVenteId = null;
 let editingVenteNumero = null;
 let busy = false; // désactive les doubles soumissions pendant un appel réseau
@@ -529,6 +530,8 @@ function render(){
   if(!loginState.loggedIn){ app.innerHTML = renderLogin(); attachLoginEvents(); return; }
   persistCartDraft();
   app.innerHTML = `
+    <button class="mobile-topbar-toggle" id="btn-toggle-sidebar" aria-label="Ouvrir le menu">☰</button>
+    <div class="sidebar-overlay ${mobileSidebarOpen?'show':''}" id="sidebar-overlay"></div>
     ${renderSidebar()}
     <div class="main">
       ${toast? `<div style="position:fixed;top:18px;right:18px;background:var(--navy);color:#fff;padding:11px 18px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:var(--shadow);z-index:100;">${toast}</div>`:''}
@@ -539,6 +542,12 @@ function render(){
     ${confirmState? renderConfirmDialog() : ''}
   `;
   attachEvents();
+  const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
+  if(btnToggleSidebar) btnToggleSidebar.onclick = ()=>{ mobileSidebarOpen = true; render(); };
+  const btnCloseSidebar = document.getElementById('btn-close-sidebar');
+  if(btnCloseSidebar) btnCloseSidebar.onclick = ()=>{ mobileSidebarOpen = false; render(); };
+  const sidebarOverlay = document.getElementById('sidebar-overlay');
+  if(sidebarOverlay) sidebarOverlay.onclick = ()=>{ mobileSidebarOpen = false; render(); };
   const btnConfirmYes = document.getElementById('btn-confirm-yes');
   if(btnConfirmYes) btnConfirmYes.onclick = ()=>{ const cb = confirmState.onYes; confirmState=null; render(); if(cb) cb(); };
   const btnConfirmNo = document.getElementById('btn-confirm-no');
@@ -659,10 +668,11 @@ function renderSidebar(){
   ].map(s=>({...s, items:s.items.filter(l=>can(l[0]))})).filter(s=>s.items.length>0);
   const stockBasCount = magasinProduitsActifs().filter(p=>stockUnites(p) <= (p.stockMinimum||0)).length;
   return `
-  <div class="sidebar">
+  <div class="sidebar ${mobileSidebarOpen?'open':''}" id="sidebar">
     <div class="brand">
       ${state.settings.logo? `<img src="${state.settings.logo}" class="brand-logo">` : ''}
       <div><div class="brand-name">${state.settings.nomCommerce}</div><div class="brand-sub">Système de gestion POS</div></div>
+      <button class="sidebar-close" id="btn-close-sidebar" aria-label="Fermer le menu">✕</button>
     </div>
     <div class="store-select"><label>Magasin actif</label>
       <select id="sel-magasin">${state.magasins.map(m=>`<option value="${m.id}" ${m.id===state.currentMagasinId?'selected':''}>${m.nom}</option>`).join('')}</select>
@@ -808,6 +818,7 @@ function ctx(){
     get offlineMode(){return offlineMode;},
     isNetworkError, queueOfflineSale, loadOfflineQueue, saveOfflineQueue, persistOfflineCache, syncOfflineQueue,
     withBusyButton, exportCSV,
+    get mobileSidebarOpen(){return mobileSidebarOpen;}, set mobileSidebarOpen(v){mobileSidebarOpen=v;},
   };
 }
 

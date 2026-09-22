@@ -12,7 +12,7 @@ import { fichesTableHTML, searchFichesEtProformas, renderSearchResults, todayISO
 export function attachAllEvents(ctx){
   const { state, supabase } = ctx;
 
-  document.querySelectorAll('.navlink').forEach(b=>b.onclick = ()=>{ ctx.view = b.dataset.view; ctx.render(); });
+  document.querySelectorAll('.navlink').forEach(b=>b.onclick = ()=>{ ctx.view = b.dataset.view; ctx.mobileSidebarOpen = false; ctx.render(); });
   const selMag = document.getElementById('sel-magasin');
   if(selMag) selMag.onchange = e=>{
     state.currentMagasinId = e.target.value;

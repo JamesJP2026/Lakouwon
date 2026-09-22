@@ -181,6 +181,35 @@
   .fab-vente{position:fixed; bottom:26px; right:26px; width:58px; height:58px; border-radius:50%; background:var(--gold); color:#1a1305; border:none; font-size:24px; box-shadow:0 8px 20px rgba(19,35,64,.3); cursor:pointer; z-index:40; display:flex; align-items:center; justify-content:center;}
   .fab-vente:hover{transform:scale(1.06);}
 
+  .mobile-topbar-toggle{display:none; position:fixed; top:12px; left:12px; z-index:56; width:42px; height:42px; border-radius:9px; background:var(--navy); color:#fff; border:none; font-size:18px; align-items:center; justify-content:center; box-shadow:var(--shadow);}
+  .sidebar-close{display:none; background:none; border:none; color:#dbe3f0; font-size:18px; margin-left:auto; cursor:pointer; padding:4px;}
+  .sidebar-overlay{display:none; position:fixed; inset:0; background:rgba(10,16,30,.55); z-index:55;}
+  .sidebar-overlay.show{display:block;}
+
+  /* ---------- MOBILE / TABLETTE ---------- */
+  @media(max-width:860px){
+    .mobile-topbar-toggle{display:flex;}
+    .sidebar-close{display:block;}
+    .sidebar{position:fixed; top:0; left:0; height:100vh; width:250px; max-width:82vw; transform:translateX(-100%); transition:transform .25s ease; z-index:60;}
+    .sidebar.open{transform:translateX(0);}
+    .main{padding:70px 14px 80px;}
+    .topbar{margin-bottom:16px;}
+    .topbar h1{font-size:19px;}
+    .btn{padding:11px 16px; font-size:14px;}
+    .btn-sm{padding:8px 12px; font-size:13px;}
+    .row2,.row3{grid-template-columns:1fr;}
+    .kpi-row{grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px;}
+    .kpi{padding:13px 14px;}
+    .kpi .val{font-size:20px;}
+    .overlay{padding:16px 10px; align-items:center;}
+    .modal{padding:18px 16px; max-height:92vh; overflow-y:auto;}
+    .fab-vente{bottom:18px; right:18px; width:52px; height:52px; font-size:21px;}
+    .table-wrap table{font-size:12.5px;}
+    th,td{padding:8px 7px;}
+    .toolbar{flex-direction:column; align-items:stretch;}
+    .toolbar .search{width:100%;}
+  }
+
   @media print{
     body *{visibility:hidden;}
     #receipt,#receipt *{visibility:visible;}
