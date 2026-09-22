@@ -284,6 +284,7 @@ export function renderFiches(ctx){
         </select>
       </div>
       <button class="btn btn-sm" id="btn-reset-filtres-fiches">✕ Réinitialiser</button>
+      <button class="btn btn-sm btn-gold" id="btn-export-fiches">📤 Exporter CSV</button>
     </div>
   </div>
   <div class="table-wrap" id="fiches-table-wrap">
@@ -447,7 +448,7 @@ export function todayISOLocal(){
   const d = new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
-function rapportDuJour(ctx, dateStr){
+export function rapportDuJour(ctx, dateStr){
   const start = new Date(dateStr+'T00:00:00');
   const end = new Date(dateStr+'T23:59:59.999');
   const dansLaJournee = d => { const dt = new Date(d); return dt>=start && dt<=end; };
@@ -475,7 +476,7 @@ export function renderRapport(ctx){
   return `
   <div class="topbar">
     <div><h1>Rapport journalier</h1><p>Vérification de toutes les opérations d'une journée par l'administrateur</p></div>
-    <div class="topbar-actions"><input type="date" id="rapport-date" value="${dateStr}"></div>
+    <div class="topbar-actions"><input type="date" id="rapport-date" value="${dateStr}"><button class="btn btn-sm btn-gold" id="btn-export-rapport">📤 Exporter CSV</button></div>
   </div>
   <div class="kpi-row">
     <div class="kpi"><div class="lbl">Chiffre d'affaires</div><div class="val num">${money(r.ca)}</div><div class="sub">${r.ventes.length} vente(s)</div></div>
@@ -597,8 +598,7 @@ function renderTransfertBuilder(ctx){
 }
 
 /* ---------- HISTORIQUE DES ACHATS ---------- */
-export function renderAchats(ctx){
-  const { money, fmt } = ctx;
+export function achatsFiltres(ctx){
   let achats = ctx.magasinAchats();
   if(ctx.achatFiltreDateDebut){
     const debut = new Date(ctx.achatFiltreDateDebut); debut.setHours(0,0,0,0);
@@ -608,6 +608,11 @@ export function renderAchats(ctx){
     const fin = new Date(ctx.achatFiltreDateFin); fin.setHours(23,59,59,999);
     achats = achats.filter(a=> new Date(a.date) <= fin);
   }
+  return achats;
+}
+export function renderAchats(ctx){
+  const { money, fmt } = ctx;
+  const achats = achatsFiltres(ctx);
   const totalGeneral = achats.reduce((s,a)=>s+a.prixTotal,0);
   return `
   <div class="topbar">
@@ -619,6 +624,7 @@ export function renderAchats(ctx){
       <div class="field" style="margin:0;"><label>Du</label><input type="date" id="achat-filtre-date-debut" value="${ctx.achatFiltreDateDebut}"></div>
       <div class="field" style="margin:0;"><label>Au</label><input type="date" id="achat-filtre-date-fin" value="${ctx.achatFiltreDateFin}"></div>
       <button class="btn btn-sm" id="btn-reset-filtres-achats">✕ Réinitialiser</button>
+      <button class="btn btn-sm btn-gold" id="btn-export-achats">📤 Exporter CSV</button>
     </div>
   </div>
   <div class="kpi-row">

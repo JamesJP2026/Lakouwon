@@ -733,6 +733,23 @@ import { renderDashboard, renderVente, renderFiches, renderProforma, renderProdu
 function printReceipt(vente){ editing = {type:'receiptPreview', html: generateReceiptHTML(ctx(), vente)}; render(); }
 function printProforma(pf){ editing = {type:'receiptPreview', html: generateProformaHTML(ctx(), pf)}; render(); }
 
+// Export CSV (ouvrable dans Excel) — séparateur point-virgule, adapté aux
+// réglages régionaux français (Excel FR sépare les colonnes par ; ).
+function exportCSV(filename, headers, rows){
+  const escape = v => {
+    const s = (v===null||v===undefined) ? '' : String(v);
+    return /[",;\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  };
+  const lines = [headers.map(escape).join(';'), ...rows.map(r=>r.map(escape).join(';'))];
+  const csv = '﻿' + lines.join('\r\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function attachEvents(){ attachAllEvents(ctx()); }
 
 /* =========================================================
@@ -790,7 +807,7 @@ function ctx(){
     upsertRow, removeRow, mapRow,
     get offlineMode(){return offlineMode;},
     isNetworkError, queueOfflineSale, loadOfflineQueue, saveOfflineQueue, persistOfflineCache, syncOfflineQueue,
-    withBusyButton,
+    withBusyButton, exportCSV,
   };
 }
 

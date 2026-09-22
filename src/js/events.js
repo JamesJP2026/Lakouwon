@@ -6,7 +6,8 @@
    paiements, salaires — voir supabase/functions.sql).
 ========================================================= */
 import { fichesTableHTML, searchFichesEtProformas, renderSearchResults, todayISOLocal,
-  lotsEditorHTML, produitLiveInfoHTML, lotMarginText, cvDynamicHTML, cvValiderDisabled } from "./views.js";
+  lotsEditorHTML, produitLiveInfoHTML, lotMarginText, cvDynamicHTML, cvValiderDisabled,
+  fichesFiltrees, achatsFiltres, rapportDuJour } from "./views.js";
 
 export function attachAllEvents(ctx){
   const { state, supabase } = ctx;
@@ -34,6 +35,15 @@ export function attachAllEvents(ctx){
   };
   document.querySelectorAll('.period-tab').forEach(b=>b.onclick = ()=>{ ctx.period = b.dataset.period; ctx.render(); });
   const rapportDateInp = document.getElementById('rapport-date'); if(rapportDateInp) rapportDateInp.onchange = e=>{ ctx.rapportDate = e.target.value; ctx.render(); };
+  const btnExportRapport = document.getElementById('btn-export-rapport');
+  if(btnExportRapport) btnExportRapport.onclick = ()=>{
+    const dateStr = ctx.rapportDate || todayISOLocal();
+    const r = rapportDuJour(ctx, dateStr);
+    ctx.exportCSV(`rapport-${dateStr}.csv`,
+      ['Numéro','Heure','Client','Mode de paiement','Total','Payé','Reste'],
+      r.ventes.map(v=>[v.numero, new Date(v.date).toLocaleTimeString('fr-FR'), v.clientId?ctx.clientName(v.clientId):'Comptant', v.modePaiement, v.total, v.montantPaye, v.reste])
+    );
+  };
   const globalSearch = document.getElementById('global-search');
   if(globalSearch){
     const wireSearchOpen = ()=>document.querySelectorAll('[data-search-open]').forEach(b=>b.onclick = ()=>{
@@ -136,6 +146,13 @@ export function attachAllEvents(ctx){
   if(btnResetFiltresFiches) btnResetFiltresFiches.onclick = ()=>{
     ctx.ficheSearch=''; ctx.ficheFiltreDateDebut=''; ctx.ficheFiltreDateFin=''; ctx.ficheFiltreMode=''; ctx.ficheFiltreEmployeId='';
     ctx.render();
+  };
+  const btnExportFiches = document.getElementById('btn-export-fiches');
+  if(btnExportFiches) btnExportFiches.onclick = ()=>{
+    ctx.exportCSV('fiches-de-vente.csv',
+      ['Numéro','Date','Client','Mode de paiement','Total','Payé','Reste'],
+      fichesFiltrees(ctx).map(v=>[v.numero, new Date(v.date).toLocaleString('fr-FR'), v.clientId?ctx.clientName(v.clientId):'Comptant', v.modePaiement, v.total, v.montantPaye, v.reste])
+    );
   };
   attachFichesTableEvents(ctx);
   const btnPayVente = document.getElementById('btn-pay-vente'); if(btnPayVente) btnPayVente.onclick = ()=>{ ctx.editing={type:'payVente', id:ctx.editing.id}; ctx.render(); };
@@ -252,6 +269,13 @@ export function attachAllEvents(ctx){
   if(achatDateFinInp) achatDateFinInp.onchange = e=>{ ctx.achatFiltreDateFin = e.target.value; ctx.render(); };
   const btnResetFiltresAchats = document.getElementById('btn-reset-filtres-achats');
   if(btnResetFiltresAchats) btnResetFiltresAchats.onclick = ()=>{ ctx.achatFiltreDateDebut=''; ctx.achatFiltreDateFin=''; ctx.render(); };
+  const btnExportAchats = document.getElementById('btn-export-achats');
+  if(btnExportAchats) btnExportAchats.onclick = ()=>{
+    ctx.exportCSV('achats.csv',
+      ['Date','Produit','Fournisseur','Quantité','Prix unitaire','Total','Employé'],
+      achatsFiltres(ctx).map(a=>[new Date(a.date).toLocaleDateString('fr-FR'), a.nom, a.fournisseur||'', a.quantite, a.quantite>0?(a.prixTotal/a.quantite).toFixed(2):0, a.prixTotal, ctx.empName(a.employeId)])
+    );
+  };
   document.querySelectorAll('[data-del-achat]').forEach(b=>b.onclick = ()=>{
     ctx.askConfirm("Supprimer cet achat de l'historique ? (le stock déjà ajouté ne sera pas retiré automatiquement)", async ()=>{
       const { error } = await supabase.from('achats').delete().eq('id', b.dataset.delAchat);
