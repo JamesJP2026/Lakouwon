@@ -477,6 +477,7 @@ function render(){
       ${toast? `<div style="position:fixed;top:18px;right:18px;background:var(--navy);color:#fff;padding:11px 18px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:var(--shadow);z-index:100;">${toast}</div>`:''}
       ${renderView()}
     </div>
+    ${view!=='vente' && can('vente') ? `<button class="fab-vente" id="btn-fab-vente" title="Nouvelle vente">🛒</button>` : ''}
     ${editing? renderModal(ctx()) : ''}
     ${confirmState? renderConfirmDialog() : ''}
   `;
@@ -485,6 +486,8 @@ function render(){
   if(btnConfirmYes) btnConfirmYes.onclick = ()=>{ const cb = confirmState.onYes; confirmState=null; render(); if(cb) cb(); };
   const btnConfirmNo = document.getElementById('btn-confirm-no');
   if(btnConfirmNo) btnConfirmNo.onclick = ()=>{ const cbNo = confirmState.onNo; confirmState=null; render(); if(cbNo) cbNo(); };
+  const btnFabVente = document.getElementById('btn-fab-vente');
+  if(btnFabVente) btnFabVente.onclick = ()=>{ view = 'vente'; render(); };
 }
 
 function renderSetup(){
