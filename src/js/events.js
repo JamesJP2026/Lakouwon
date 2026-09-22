@@ -742,7 +742,7 @@ export function attachAllEvents(ctx){
     const emailVal = document.getElementById('f-email').value.trim();
     if(!emailVal){ ctx.showToast("Renseignez d'abord l'email de l'agent"); return; }
     const { data, error } = await supabase.functions.invoke('admin-employee', { body:{ action:'set_password', employe_id: ctx.editing.id, email: emailVal } });
-    if(error || data?.error){ ctx.showToast(data?.error || await ctx.edgeFunctionErrorMessage(error)); return; }
+    if(error || data?.error){ alert(data?.error || await ctx.edgeFunctionErrorMessage(error)); return; }
     ctx.generatedPasswordPreview = data.password;
     const emp = state.employes.find(x=>x.id===ctx.editing.id);
     if(emp) emp.email = emailVal.toLowerCase();
