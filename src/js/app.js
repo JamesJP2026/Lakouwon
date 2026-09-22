@@ -564,7 +564,13 @@ function render(){
       ${toast? `<div style="position:fixed;top:18px;right:18px;background:var(--navy);color:#fff;padding:11px 18px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:var(--shadow);z-index:100;">${toast}</div>`:''}
       ${renderView()}
     </div>
-    ${view!=='vente' && can('vente') ? `<button class="fab-vente" id="btn-fab-vente" title="Nouvelle vente">🛒</button>` : ''}
+    ${view!=='vente' && can('vente') ? `<button class="fab-vente" id="btn-fab-vente" title="Nouvelle vente">
+      <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="9" cy="21" r="1.4" fill="#fff" stroke="none"></circle>
+        <circle cx="18.5" cy="21" r="1.4" fill="#fff" stroke="none"></circle>
+        <path d="M2.5 3h2.4l1.9 11.6a2 2 0 0 0 2 1.7h8.4a2 2 0 0 0 1.97-1.63L20.8 7.3H6.1"></path>
+      </svg>
+    </button>` : ''}
     ${editing? renderModal(ctx()) : ''}
     ${confirmState? renderConfirmDialog() : ''}
   `;
