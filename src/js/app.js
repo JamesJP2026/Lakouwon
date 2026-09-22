@@ -590,22 +590,13 @@ function connectivityBannerHTML(){
 
 function renderSidebar(){
   const u = currentUser();
-  const links = [
-    ['dashboard','📊','Tableau de bord'],
-    ['vente','🛒','Nouvelle vente'],
-    ['fiches','🧾','Fiches de vente'],
-    ['proforma','📄','Proforma'],
-    ['produits','📦','Produits & Stock'],
-    ['clients','👥','Clients & Dettes'],
-    ['caisse','💵','Caisse'],
-    ['depenses','💸','Dépenses'],
-    ['transferts','🔄','Transfert entre magasins'],
-    ['achats','📥','Historique des achats'],
-    ['rapport','📅','Rapport journalier'],
-    ['employes','🧑‍💼','Employés & Paie'],
-    ['journal','📜','Journal'],
-    ['parametres','⚙️','Paramètres'],
-  ].filter(l=>can(l[0]));
+  const sections = [
+    {label:null, items:[['dashboard','📊','Tableau de bord']]},
+    {label:'Ventes', items:[['vente','🛒','Nouvelle vente'],['fiches','🧾','Fiches de vente'],['proforma','📄','Proforma']]},
+    {label:'Stock', items:[['produits','📦','Produits & Stock'],['transferts','🔄','Transfert entre magasins'],['achats','📥','Historique des achats']]},
+    {label:'Finances', items:[['clients','👥','Clients & Dettes'],['caisse','💵','Caisse'],['depenses','💸','Dépenses'],['rapport','📅','Rapport journalier']]},
+    {label:'Administration', items:[['employes','🧑‍💼','Employés & Paie'],['journal','📜','Journal'],['parametres','⚙️','Paramètres']]},
+  ].map(s=>({...s, items:s.items.filter(l=>can(l[0]))})).filter(s=>s.items.length>0);
   return `
   <div class="sidebar">
     <div class="brand">
@@ -615,7 +606,10 @@ function renderSidebar(){
     <div class="store-select"><label>Magasin actif</label>
       <select id="sel-magasin">${state.magasins.map(m=>`<option value="${m.id}" ${m.id===state.currentMagasinId?'selected':''}>${m.nom}</option>`).join('')}</select>
     </div>
-    <nav class="navlinks">${links.map(([id,ic,label])=>`<button class="navlink ${view===id?'active':''}" data-view="${id}"><span class="ic">${ic}</span>${label}</button>`).join('')}</nav>
+    <nav class="navlinks">${sections.map(s=>`
+      ${s.label? `<div class="navsection-label">${s.label}</div>` : ''}
+      ${s.items.map(([id,ic,label])=>`<button class="navlink ${view===id?'active':''}" data-view="${id}"><span class="ic">${ic}</span>${label}</button>`).join('')}
+    `).join('')}</nav>
     ${connectivityBannerHTML()}
     <div class="sidebar-foot">
       Connecté : <b>${u?u.nom:''}</b><br>${u?u.role:''}
