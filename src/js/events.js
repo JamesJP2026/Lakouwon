@@ -635,24 +635,22 @@ export function attachAllEvents(ctx){
       if(editor){ editor.innerHTML = lotsEditorHTML(ctx, currentProduitDraft()); attachLotsEditorEvents(ctx, currentProduitDraft()); }
     };
     const catSelect = document.getElementById('f-categorie-select');
-    const catNewInput = document.getElementById('f-categorie-new');
-    const showCatNewInput = ()=>{
-      catNewInput.style.display = '';
-      catNewInput.focus();
+    const promptNewCategorie = ()=>{
+      const nom = (prompt('Nom de la nouvelle catégorie :')||'').trim();
+      if(!nom){ catSelect.value = ''; return; }
+      const dejaLa = Array.from(catSelect.options).find(o=>o.value.toLowerCase()===nom.toLowerCase());
+      if(dejaLa){ catSelect.value = dejaLa.value; return; }
+      const option = document.createElement('option');
+      option.value = nom; option.textContent = nom;
+      catSelect.insertBefore(option, catSelect.querySelector('option[value="__new__"]'));
+      catSelect.value = nom;
     };
-    if(catSelect && catNewInput){
-      catSelect.onchange = ()=>{
-        const isNew = catSelect.value === '__new__';
-        catNewInput.style.display = isNew ? '' : 'none';
-        if(isNew) catNewInput.focus();
-      };
+    if(catSelect){
+      catSelect.onchange = ()=>{ if(catSelect.value === '__new__') promptNewCategorie(); };
     }
     const btnCatNewInline = document.getElementById('btn-cat-new-inline');
-    if(btnCatNewInline && catSelect && catNewInput){
-      btnCatNewInline.onclick = ()=>{
-        catSelect.value = '__new__';
-        showCatNewInput();
-      };
+    if(btnCatNewInline && catSelect){
+      btnCatNewInline.onclick = promptNewCategorie;
     }
   }
 
@@ -660,11 +658,7 @@ export function attachAllEvents(ctx){
   if(btnSaveProduit) btnSaveProduit.onclick = ()=> ctx.withBusyButton(btnSaveProduit, async ()=>{
     const nom = document.getElementById('f-nom').value.trim();
     if(!nom){ ctx.showToast('Le nom du produit est requis'); return; }
-    const catSelectVal = document.getElementById('f-categorie-select').value;
-    const categorie = catSelectVal === '__new__'
-      ? document.getElementById('f-categorie-new').value.trim()
-      : catSelectVal;
-    if(catSelectVal==='__new__' && !categorie){ ctx.showToast('Entrez le nom de la nouvelle catégorie'); return; }
+    const categorie = document.getElementById('f-categorie-select').value === '__new__' ? '' : document.getElementById('f-categorie-select').value;
     const data = {
       nom,
       categorie,

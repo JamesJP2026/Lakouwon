@@ -1154,7 +1154,6 @@ function modalProduit(ctx){
           </select>
           <button type="button" class="btn btn-sm" id="btn-cat-new-inline" title="Créer une nouvelle catégorie">+ Créer</button>
         </div>
-        <input id="f-categorie-new" placeholder="Nom de la nouvelle catégorie" style="display:none; margin-top:6px;" spellcheck="true" lang="fr" autocorrect="on" autocapitalize="words">
       </div>
     </div>
     <div class="row2">
