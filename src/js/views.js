@@ -323,9 +323,9 @@ export function renderProduits(ctx){
   </div>
   <div class="muted" style="font-size:12px; margin-bottom:14px;">Un produit sans vente depuis ${ctx.SEUIL_ARCHIVAGE_JOURS} jours est archivé automatiquement et retiré du point de vente. Vous pouvez le réactiver à tout moment.</div>
   <div class="panel" style="padding:12px 16px; margin-bottom:16px; display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px;">
-    <div><b style="font-size:18px;">${fmt(produits.length)}</b> <span class="muted">produit${produits.length>1?'s':''} enregistré${produits.length>1?'s':''}</span></div>
+    <button type="button" class="btn btn-sm" id="btn-cat-filter-tous" style="font-weight:700;"><b style="font-size:18px;">${fmt(produits.length)}</b> produit${produits.length>1?'s':''} enregistré${produits.length>1?'s':''}</button>
     ${categoriesTriees.length? `<div style="display:flex; flex-wrap:wrap; gap:6px 10px; border-left:1px solid var(--line); padding-left:14px;">
-      ${categoriesTriees.map(([cat,n])=>`<span class="badge cash" title="${cat}">${cat} : ${fmt(n)}</span>`).join('')}
+      ${categoriesTriees.map(([cat,n])=>`<button type="button" class="badge cash" data-cat-filter="${cat==='Sans catégorie'?'__none__':cat}" title="Voir les produits de ${cat}" style="border:none; cursor:pointer; font:inherit;">${cat} : ${fmt(n)}</button>`).join('')}
     </div>` : ''}
   </div>
   <input class="search" id="produits-search" placeholder="🔎 Rechercher un produit ou une catégorie..." style="width:100%; max-width:340px; margin-bottom:16px;">
@@ -334,7 +334,7 @@ export function renderProduits(ctx){
       const total = ctx.stockUnites(p);
       const bas = total <= (p.stockMinimum||0);
       const lots = p.lots||[];
-      return `<div class="product-card" data-name="${(p.nom+' '+(p.categorie||'')).toLowerCase()}" style="${p.archive?'opacity:.6;':''}">
+      return `<div class="product-card" data-name="${(p.nom+' '+(p.categorie||'')).toLowerCase()}" data-cat="${p.categorie||'__none__'}" style="${p.archive?'opacity:.6;':''}">
         <div class="pc-head">
           <div class="pc-name">${p.nom} ${p.archive?'<span class="badge role-Caissier">Archivé</span>':''}</div>
           <span class="badge ${bas?'credit':'cash'}">${fmt(total)} u.</span>

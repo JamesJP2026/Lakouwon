@@ -195,6 +195,18 @@ export function attachAllEvents(ctx){
     const q = produitsSearch.value.toLowerCase();
     document.querySelectorAll('#product-grid .product-card').forEach(c=>{ c.style.display = c.dataset.name.includes(q) ? '' : 'none'; });
   };
+  const btnCatFilterTous = document.getElementById('btn-cat-filter-tous');
+  if(btnCatFilterTous) btnCatFilterTous.onclick = ()=>{
+    if(produitsSearch) produitsSearch.value = '';
+    document.querySelectorAll('#product-grid .product-card').forEach(c=>{ c.style.display = ''; });
+    document.getElementById('product-grid')?.scrollIntoView({ behavior:'smooth', block:'start' });
+  };
+  document.querySelectorAll('[data-cat-filter]').forEach(b=>b.onclick = ()=>{
+    if(produitsSearch) produitsSearch.value = '';
+    const cat = b.dataset.catFilter;
+    document.querySelectorAll('#product-grid .product-card').forEach(c=>{ c.style.display = c.dataset.cat===cat ? '' : 'none'; });
+    document.getElementById('product-grid')?.scrollIntoView({ behavior:'smooth', block:'start' });
+  });
   const btnExportStockCsv = document.getElementById('btn-export-stock-csv');
   if(btnExportStockCsv) btnExportStockCsv.onclick = ()=>{
     ctx.exportCSV('stock.csv',
