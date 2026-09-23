@@ -882,8 +882,8 @@ export function renderParametres(ctx){
         <div class="muted" style="font-size:11.5px; margin-top:4px;">Utilisé sur les fiches et proformas imprimées</div>
       </div>
     </div>
-    <div class="field"><label>Nom du commerce</label><input id="set-nom" value="${s.nomCommerce}"></div>
-    <div class="field"><label>Adresse</label><input id="set-adresse" value="${s.adresse||''}"></div>
+    <div class="field"><label>Nom du commerce</label><input id="set-nom" value="${s.nomCommerce}" spellcheck="true" lang="fr" autocorrect="on" autocapitalize="words"></div>
+    <div class="field"><label>Adresse</label><input id="set-adresse" value="${s.adresse||''}" spellcheck="true" lang="fr" autocorrect="on" autocapitalize="sentences"></div>
     <div class="row2">
       <div class="field"><label>Téléphone</label><input id="set-telephone" value="${s.telephone||''}"></div>
       <div class="field"><label>Email</label><input id="set-email" value="${s.email||''}"></div>
@@ -920,7 +920,7 @@ export function renderParametres(ctx){
       <button class="btn btn-sm btn-danger" data-del-categorie="${c.id}">Suppr.</button>
     </div>`).join('') : `<div class="muted" style="padding:6px 0;">Aucune catégorie créée pour l'instant.</div>`}
     <div class="row2" style="margin-top:12px;">
-      <input id="new-categorie-nom" placeholder="Ex: Boissons, Épicerie...">
+      <input id="new-categorie-nom" placeholder="Ex: Boissons, Épicerie..." spellcheck="true" lang="fr" autocorrect="on" autocapitalize="words">
       <button class="btn btn-primary" id="btn-add-categorie">+ Ajouter</button>
     </div>
   </div>
@@ -1003,7 +1003,7 @@ function renderProformaBuilder(ctx){
         <select id="pf-client"><option value="">— Aucun —</option>${clients.map(c=>`<option value="${c.id}" ${ctx.proformaClientId===c.id?'selected':''}>${c.nom}</option>`).join('')}</select>
       </div>
       <div class="field"><label>Ou nom du client (libre)</label><input id="pf-client-libre" value="${ctx.proformaClientNomLibre}" placeholder="Ex: Client de passage"></div>
-      <div class="field"><label>Notes</label><textarea id="pf-notes" rows="2">${ctx.proformaNotes}</textarea></div>
+      <div class="field"><label>Notes</label><textarea id="pf-notes" rows="2" spellcheck="true" lang="fr" autocorrect="on" autocapitalize="sentences">${ctx.proformaNotes}</textarea></div>
 
       <button class="btn btn-primary" id="btn-save-proforma" style="width:100%; justify-content:center; padding:12px;" ${ctx.proformaCart.length===0?'disabled':''}>✔ Enregistrer & imprimer</button>
     </div>
@@ -1144,7 +1144,7 @@ function modalProduit(ctx){
   return `<div class="overlay" id="overlay"><div class="modal wide">
     <h2>${ctx.editing.id?'Modifier le produit':'Nouveau produit'}</h2>
     <div class="row2">
-      <div class="field"><label>Nom du produit</label><input id="f-nom" value="${p.nom}"></div>
+      <div class="field"><label>Nom du produit</label><input id="f-nom" value="${p.nom}" spellcheck="true" lang="fr" autocorrect="on" autocapitalize="sentences"></div>
       <div class="field"><label>Catégorie</label>
         <div style="display:flex; gap:6px;">
           <select id="f-categorie-select" style="flex:1;">
@@ -1154,7 +1154,7 @@ function modalProduit(ctx){
           </select>
           <button type="button" class="btn btn-sm" id="btn-cat-new-inline" title="Créer une nouvelle catégorie">+ Créer</button>
         </div>
-        <input id="f-categorie-new" placeholder="Nom de la nouvelle catégorie" style="display:none; margin-top:6px;">
+        <input id="f-categorie-new" placeholder="Nom de la nouvelle catégorie" style="display:none; margin-top:6px;" spellcheck="true" lang="fr" autocorrect="on" autocapitalize="words">
       </div>
     </div>
     <div class="row2">
@@ -1197,8 +1197,8 @@ function modalClient(ctx){
   const c = ctx.editing.id ? ctx.state.clients.find(x=>x.id===ctx.editing.id) : {nom:'',telephone:''};
   return `<div class="overlay" id="overlay"><div class="modal">
     <h2>${ctx.editing.id?'Modifier le client':'Nouveau client'}</h2>
-    <div class="field"><label>Nom</label><input id="f-nom" value="${c.nom}"></div>
-    <div class="field"><label>Téléphone</label><input id="f-telephone" value="${c.telephone||''}"></div>
+    <div class="field"><label>Nom</label><input id="f-nom" value="${c.nom}" spellcheck="true" lang="fr" autocorrect="on" autocapitalize="words"></div>
+    <div class="field"><label>Téléphone</label><input id="f-telephone" value="${c.telephone||''}" spellcheck="false" autocorrect="off"></div>
     <div class="modal-actions"><button class="btn" id="btn-cancel">Annuler</button><button class="btn btn-primary" id="btn-save-client">Enregistrer</button></div>
   </div></div>`;
 }
@@ -1207,7 +1207,7 @@ function modalEmploye(ctx){
   const e = ctx.editing.id ? ctx.state.employes.find(x=>x.id===ctx.editing.id) : {nom:'',role:'Caissier',telephone:'',email:'',salaire:0,actif:true};
   return `<div class="overlay" id="overlay"><div class="modal wide">
     <h2>${ctx.editing.id?"Modifier l'employé":'Nouvel employé'}</h2>
-    <div class="field"><label>Nom complet</label><input id="f-nom" value="${e.nom}"></div>
+    <div class="field"><label>Nom complet</label><input id="f-nom" value="${e.nom}" spellcheck="true" lang="fr" autocorrect="on" autocapitalize="words"></div>
     <div class="row2">
       <div class="field"><label>Étiquette du rôle (affichage)</label>
         <select id="f-role">
@@ -1217,7 +1217,7 @@ function modalEmploye(ctx){
           <option value="Personnalisé" ${e.role==='Personnalisé'?'selected':''}>Personnalisé</option>
         </select>
       </div>
-      <div class="field"><label>Téléphone</label><input id="f-telephone" value="${e.telephone||''}"></div>
+      <div class="field"><label>Téléphone</label><input id="f-telephone" value="${e.telephone||''}" spellcheck="false" autocorrect="off"></div>
     </div>
     <div class="row2">
       <div class="field"><label>Salaire (par période)</label><input type="number" id="f-salaire" value="${e.salaire||0}" min="0"></div>
@@ -1294,7 +1294,7 @@ function modalCaisseMouvement(ctx){
   const isEntree = ctx.editing.mode==='entree';
   return `<div class="overlay" id="overlay"><div class="modal">
     <h2>${isEntree?'Entrée de caisse':'Sortie de caisse / Dépense'}</h2>
-    <div class="field"><label>Motif</label><input id="f-motif" placeholder="${isEntree?'Ex: Apport de fonds':'Ex: Achat fournitures, loyer...'}"></div>
+    <div class="field"><label>Motif</label><input id="f-motif" placeholder="${isEntree?'Ex: Apport de fonds':'Ex: Achat fournitures, loyer...'}" spellcheck="true" lang="fr" autocorrect="on" autocapitalize="sentences"></div>
     <div class="field"><label>Montant</label><input type="number" id="f-montant" min="0" value="0"></div>
     <div class="modal-actions"><button class="btn" id="btn-cancel">Annuler</button><button class="btn btn-primary" id="btn-save-caisse">Enregistrer</button></div>
   </div></div>`;
@@ -1311,11 +1311,11 @@ function modalMagasin(ctx){
         <div class="muted" style="font-size:11px; margin-top:4px;">Logo propre à ce magasin (sinon le logo général est utilisé sur les fiches)</div>
       </div>
     </div>
-    <div class="field"><label>Nom du magasin</label><input id="f-nom" value="${m.nom}" placeholder="Ex: Succursale Delmas"></div>
-    <div class="field"><label>Adresse</label><input id="f-adresse" value="${m.adresse||''}" placeholder="Ex: Delmas 33"></div>
+    <div class="field"><label>Nom du magasin</label><input id="f-nom" value="${m.nom}" placeholder="Ex: Succursale Delmas" spellcheck="true" lang="fr" autocorrect="on" autocapitalize="words"></div>
+    <div class="field"><label>Adresse</label><input id="f-adresse" value="${m.adresse||''}" placeholder="Ex: Delmas 33" spellcheck="true" lang="fr" autocorrect="on" autocapitalize="sentences"></div>
     <div class="row2">
-      <div class="field"><label>Téléphone</label><input id="f-telephone" value="${m.telephone||''}"></div>
-      <div class="field"><label>Email</label><input id="f-email" value="${m.email||''}"></div>
+      <div class="field"><label>Téléphone</label><input id="f-telephone" value="${m.telephone||''}" spellcheck="false" autocorrect="off"></div>
+      <div class="field"><label>Email</label><input id="f-email" value="${m.email||''}" spellcheck="false" autocorrect="off" autocapitalize="none"></div>
     </div>
     <div class="modal-actions"><button class="btn" id="btn-cancel">Annuler</button><button class="btn btn-primary" id="btn-save-magasin">${ctx.editing.id?'Enregistrer':'Créer'}</button></div>
   </div></div>`;
