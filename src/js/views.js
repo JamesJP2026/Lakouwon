@@ -304,6 +304,9 @@ export function renderProduits(ctx){
   const tousProduits = ctx.magasinProduits();
   const produits = tousProduits.filter(p => ctx.produitsFiltre==='tous' ? true : ctx.produitsFiltre==='archives' ? p.archive : !p.archive);
   const nbArchives = tousProduits.filter(p=>p.archive).length;
+  const parCategorie = {};
+  produits.forEach(p=>{ const c = p.categorie || 'Sans catégorie'; parCategorie[c] = (parCategorie[c]||0)+1; });
+  const categoriesTriees = Object.entries(parCategorie).sort((a,b)=>b[1]-a[1]);
   return `
   <div class="topbar">
     <div><h1>Produits & Stock</h1><p>Gérez votre inventaire, vos prix détail et gros</p></div>
@@ -319,6 +322,12 @@ export function renderProduits(ctx){
     <button class="period-tab ${ctx.produitsFiltre==='tous'?'active':''}" data-produits-filtre="tous">Tous</button>
   </div>
   <div class="muted" style="font-size:12px; margin-bottom:14px;">Un produit sans vente depuis ${ctx.SEUIL_ARCHIVAGE_JOURS} jours est archivé automatiquement et retiré du point de vente. Vous pouvez le réactiver à tout moment.</div>
+  <div class="panel" style="padding:12px 16px; margin-bottom:16px; display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px;">
+    <div><b style="font-size:18px;">${fmt(produits.length)}</b> <span class="muted">produit${produits.length>1?'s':''} enregistré${produits.length>1?'s':''}</span></div>
+    ${categoriesTriees.length? `<div style="display:flex; flex-wrap:wrap; gap:6px 10px; border-left:1px solid var(--line); padding-left:14px;">
+      ${categoriesTriees.map(([cat,n])=>`<span class="badge cash" title="${cat}">${cat} : ${fmt(n)}</span>`).join('')}
+    </div>` : ''}
+  </div>
   <input class="search" id="produits-search" placeholder="🔎 Rechercher un produit ou une catégorie..." style="width:100%; max-width:340px; margin-bottom:16px;">
   <div class="product-grid" id="product-grid">
     ${produits.length? produits.map(p=>{
