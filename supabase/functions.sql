@@ -627,6 +627,55 @@ end;
 $$;
 
 -- ---------------------------------------------------------
+-- rpc_add_achats_groupe — enregistre une LISTE d'achats (plusieurs
+-- produits) en une seule entrée de journal (même achat_groupe_id) et
+-- ajoute automatiquement chaque quantité au stock détail, de façon
+-- atomique (tout ou rien).
+-- p_items: [{"produit_id":"uuid","quantite":n,"prix_total":numeric}]
+-- ---------------------------------------------------------
+create or replace function rpc_add_achats_groupe(
+  p_magasin_id uuid, p_date date, p_fournisseur text, p_items jsonb
+) returns setof achats language plpgsql security definer set search_path = public as $$
+declare
+  v_employe employes;
+  v_produit produits;
+  v_item jsonb;
+  v_groupe_id uuid := gen_random_uuid();
+  v_quantite int;
+  v_prix_total numeric;
+  v_nb int := 0;
+  v_total numeric := 0;
+  v_noms text := '';
+begin
+  v_employe := current_employe_row();
+  if not has_perm('achats') then raise exception 'Permission refusée : achats'; end if;
+  if p_items is null or jsonb_array_length(p_items) = 0 then raise exception 'La liste d''achat est vide'; end if;
+
+  for v_item in select * from jsonb_array_elements(p_items) loop
+    v_quantite := (v_item->>'quantite')::int;
+    v_prix_total := coalesce((v_item->>'prix_total')::numeric, 0);
+    select * into v_produit from produits where id = (v_item->>'produit_id')::uuid for update;
+    if not found then raise exception 'Produit introuvable'; end if;
+    if v_quantite <= 0 then raise exception 'Quantité invalide pour %', v_produit.nom; end if;
+
+    insert into achats (magasin_id, date, produit_id, nom, quantite, prix_total, fournisseur, employe_id, achat_groupe_id)
+    values (p_magasin_id, p_date::timestamptz + time '12:00', v_produit.id, v_produit.nom, v_quantite, v_prix_total, coalesce(p_fournisseur,''), v_employe.id, v_groupe_id);
+
+    update produits set quantite_detail = quantite_detail + v_quantite where id = v_produit.id;
+
+    v_nb := v_nb + 1;
+    v_total := v_total + v_prix_total;
+    v_noms := v_noms || case when v_noms='' then '' else ', ' end || v_produit.nom;
+  end loop;
+
+  insert into journal (date, action, details, employe_id, magasin_id)
+  values (now(), 'Achat enregistré (' || v_nb::text || ' produits)', v_noms || ' · ' || v_total::text || coalesce(' · '||nullif(p_fournisseur,''),''), v_employe.id, p_magasin_id);
+
+  return query select * from achats where achat_groupe_id = v_groupe_id;
+end;
+$$;
+
+-- ---------------------------------------------------------
 -- rpc_pay_salaire — enregistre un paiement de salaire et, si
 -- réglé en espèces, la sortie de caisse correspondante.
 -- ---------------------------------------------------------
@@ -688,7 +737,7 @@ grant execute on function
   rpc_finalize_sale, rpc_modifier_vente, rpc_delete_vente,
   rpc_pay_client_debt, rpc_pay_vente,
   rpc_creer_transfert, rpc_confirmer_transfert, rpc_annuler_transfert,
-  rpc_add_achat, rpc_pay_salaire, rpc_auto_archive_produits_inactifs
+  rpc_add_achat, rpc_add_achats_groupe, rpc_pay_salaire, rpc_auto_archive_produits_inactifs
 to authenticated;
 
 -- Si vous avez déjà exécuté une version précédente de ce fichier,

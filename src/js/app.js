@@ -15,7 +15,7 @@ const ROW_MAPS = {
   ventes: { id:'id', numero:'numero', magasin_id:'magasinId', date:'date', items:'items', total_brut:'totalBrut', remise:'remise', total:'total', cout_total:'coutTotal', mode_paiement:'modePaiement', montant_recu:'montantRecu', monnaie_rendue:'monnaieRendue', montant_paye:'montantPaye', reste:'reste', client_id:'clientId', employe_id:'employeId', paiements:'paiements' },
   proformas: { id:'id', numero:'numero', magasin_id:'magasinId', date:'date', client_id:'clientId', client_nom_libre:'clientNomLibre', items:'items', total:'total', employe_id:'employeId', notes:'notes' },
   transferts: { id:'id', numero:'numero', date:'date', magasin_source_id:'magasinSourceId', magasin_dest_id:'magasinDestId', items:'items', employe_id:'employeId', statut:'statut', date_reception:'dateReception', confirme_par:'confirmePar' },
-  achats: { id:'id', magasin_id:'magasinId', date:'date', produit_id:'produitId', nom:'nom', quantite:'quantite', prix_total:'prixTotal', fournisseur:'fournisseur', employe_id:'employeId' },
+  achats: { id:'id', magasin_id:'magasinId', date:'date', produit_id:'produitId', nom:'nom', quantite:'quantite', prix_total:'prixTotal', fournisseur:'fournisseur', employe_id:'employeId', achat_groupe_id:'achatGroupeId' },
   caisse_movements: { id:'id', magasin_id:'magasinId', date:'date', type:'type', montant:'montant', motif:'motif', employe_id:'employeId', source:'source', vente_id:'venteId' },
   payroll_paiements: { id:'id', employe_id:'employeId', montant:'montant', date:'date', periode:'periode' },
   journal: { id:'id', date:'date', action:'action', details:'details', employe_id:'employeId', magasin_id:'magasinId' },
@@ -123,7 +123,7 @@ const THEME_PRESETS = [
 const PERMS_ALL = ['dashboard','vente','fiches','proforma','produits','clients','caisse','depenses','transferts','achats','rapport','employes','journal','parametres'];
 const PERMS_LABELS = {
   dashboard:'Tableau de bord', vente:'Nouvelle vente', fiches:'Fiches de vente', proforma:'Proforma',
-  produits:'Produits & Stock', clients:'Clients & Dettes', caisse:'Caisse', depenses:'Dépenses', transferts:'Transfert entre magasins', achats:'Historique des achats', rapport:'Rapport journalier',
+  produits:'Produits & Stock', clients:'Clients & Dettes', caisse:'Caisse', depenses:'Dépenses', transferts:'Transfert entre magasins', achats:'Journal d\'achat', rapport:'Rapport journalier',
   employes:'Employés & Paie', journal:'Journal', parametres:'Paramètres'
 };
 const PERMS_PRESETS = {
@@ -177,6 +177,9 @@ let achatFiltreDateDebut = '';
 let achatFiltreDateFin = '';
 let caisseFiltreDateDebut = '';
 let caisseFiltreDateFin = '';
+let achatCart = [];
+let achatDate = '';
+let achatFournisseur = '';
 let inventaireSearch = '';
 let inventaireComptages = {};
 let productLotsDraft = [];
@@ -702,7 +705,7 @@ function renderSidebar(){
   const sections = [
     {label:null, items:[['dashboard','📊','Tableau de bord']]},
     {label:'Ventes', items:[['vente','🛒','Nouvelle vente'],['fiches','🧾','Fiches de vente'],['proforma','📄','Proforma']]},
-    {label:'Stock', items:[['produits','📦','Produits & Stock'],['inventaire','📋','Inventaire physique','produits'],['transferts','🔄','Transfert entre magasins'],['achats','📥','Historique des achats']]},
+    {label:'Stock', items:[['produits','📦','Produits & Stock'],['inventaire','📋','Inventaire physique','produits'],['transferts','🔄','Transfert entre magasins'],['achats','📥','Journal d\'achat']]},
     {label:'Finances', items:[['clients','👥','Clients & Dettes'],['caisse','💵','Caisse'],['depenses','💸','Dépenses'],['rapport','📅','Rapport journalier']]},
     {label:'Administration', items:[['employes','🧑‍💼','Employés & Paie'],['journal','📜','Journal'],['parametres','⚙️','Paramètres']]},
   ].map(s=>({...s, items:s.items.filter(l=>can(l[3]||l[0]))})).filter(s=>s.items.length>0);
@@ -833,6 +836,9 @@ function ctx(){
     get achatFiltreDateFin(){return achatFiltreDateFin;}, set achatFiltreDateFin(v){achatFiltreDateFin=v;},
     get caisseFiltreDateDebut(){return caisseFiltreDateDebut;}, set caisseFiltreDateDebut(v){caisseFiltreDateDebut=v;},
     get caisseFiltreDateFin(){return caisseFiltreDateFin;}, set caisseFiltreDateFin(v){caisseFiltreDateFin=v;},
+    get achatCart(){return achatCart;}, set achatCart(v){achatCart=v;},
+    get achatDate(){return achatDate;}, set achatDate(v){achatDate=v;},
+    get achatFournisseur(){return achatFournisseur;}, set achatFournisseur(v){achatFournisseur=v;},
     get inventaireSearch(){return inventaireSearch;}, set inventaireSearch(v){inventaireSearch=v;},
     get inventaireComptages(){return inventaireComptages;}, set inventaireComptages(v){inventaireComptages=v;},
     persistInventaireDraft,

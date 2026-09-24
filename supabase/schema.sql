@@ -194,6 +194,11 @@ create table if not exists achats (
 );
 create index if not exists idx_achats_magasin on achats(magasin_id);
 
+-- `achat_groupe_id` regroupe les lignes d'une même liste d'achat validée
+-- d'un coup (journal d'achat), pour les afficher comme une seule entrée.
+alter table achats add column if not exists achat_groupe_id uuid;
+create index if not exists idx_achats_groupe on achats(achat_groupe_id);
+
 -- ---------------------------------------------------------
 -- CAISSE MOVEMENTS
 -- ---------------------------------------------------------

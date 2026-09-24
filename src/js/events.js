@@ -359,8 +359,11 @@ export function attachAllEvents(ctx){
   const btnResetFiltresCaisse = document.getElementById('btn-reset-filtres-caisse');
   if(btnResetFiltresCaisse) btnResetFiltresCaisse.onclick = ()=>{ ctx.caisseFiltreDateDebut=''; ctx.caisseFiltreDateFin=''; ctx.render(); };
 
-  /* ---------------- Historique des achats ---------------- */
-  const btnNewAchat = document.getElementById('btn-new-achat'); if(btnNewAchat) btnNewAchat.onclick = ()=>{ ctx.editing={type:'achat'}; ctx.render(); };
+  /* ---------------- Journal d'achat ---------------- */
+  const btnNewAchat = document.getElementById('btn-new-achat'); if(btnNewAchat) btnNewAchat.onclick = ()=>{
+    ctx.achatCart = []; ctx.achatDate = todayISOLocal(); ctx.achatFournisseur = '';
+    ctx.editing={type:'achat'}; ctx.render();
+  };
   const achatDateDebutInp = document.getElementById('achat-filtre-date-debut');
   if(achatDateDebutInp) achatDateDebutInp.onchange = e=>{ ctx.achatFiltreDateDebut = e.target.value; ctx.render(); };
   const achatDateFinInp = document.getElementById('achat-filtre-date-fin');
@@ -374,34 +377,52 @@ export function attachAllEvents(ctx){
       achatsFiltres(ctx).map(a=>[new Date(a.date).toLocaleDateString('fr-FR'), a.nom, a.fournisseur||'', a.quantite, a.quantite>0?(a.prixTotal/a.quantite).toFixed(2):0, a.prixTotal, ctx.empName(a.employeId)])
     );
   };
-  document.querySelectorAll('[data-del-achat]').forEach(b=>b.onclick = ()=>{
-    ctx.askConfirm("Supprimer cet achat de l'historique ? (le stock déjà ajouté ne sera pas retiré automatiquement)", async ()=>{
-      const { error } = await supabase.from('achats').delete().eq('id', b.dataset.delAchat);
+  document.querySelectorAll('[data-voir-achat]').forEach(b=>b.onclick = ()=>{ ctx.editing={type:'voirAchat', id:b.dataset.voirAchat}; ctx.render(); });
+  document.querySelectorAll('[data-del-achat-groupe]').forEach(b=>b.onclick = ()=>{
+    const cle = b.dataset.delAchatGroupe;
+    ctx.askConfirm("Supprimer cet achat du journal ? (le stock déjà ajouté ne sera pas retiré automatiquement)", async ()=>{
+      const { error } = await supabase.from('achats').delete().or(`id.eq.${cle},achat_groupe_id.eq.${cle}`);
       if(error){ ctx.showToast(ctx.friendlyError(error)); return; }
-      state.achats = state.achats.filter(x=>x.id!==b.dataset.delAchat);
+      state.achats = state.achats.filter(x=>x.id!==cle && x.achatGroupeId!==cle);
       ctx.render();
     });
   });
-  const btnSaveAchat = document.getElementById('btn-save-achat');
-  if(btnSaveAchat) btnSaveAchat.onclick = async ()=>{
-    const produitId = document.getElementById('f-achat-produit').value;
+
+  const fAchatDate = document.getElementById('f-achat-date'); if(fAchatDate) fAchatDate.oninput = e=>{ ctx.achatDate = e.target.value; };
+  const fAchatFournisseur = document.getElementById('f-achat-fournisseur'); if(fAchatFournisseur) fAchatFournisseur.oninput = e=>{ ctx.achatFournisseur = e.target.value; };
+  const btnAddAchatLigne = document.getElementById('btn-add-achat-ligne');
+  if(btnAddAchatLigne) btnAddAchatLigne.onclick = ()=>{
+    const produitId = document.getElementById('f-achat-ligne-produit').value;
     const p = state.produits.find(x=>x.id===produitId);
     if(!p){ ctx.showToast('Sélectionnez un produit'); return; }
+    const quantite = parseInt(document.getElementById('f-achat-ligne-quantite').value)||0;
+    const prixTotal = parseFloat(document.getElementById('f-achat-ligne-prixtotal').value)||0;
+    if(quantite<=0){ ctx.showToast('Quantité invalide'); return; }
+    ctx.achatCart.push({ produitId, nom:p.nom, quantite, prixTotal });
+    ctx.render();
+  };
+  document.querySelectorAll('[data-remove-achat-ligne]').forEach(b=>b.onclick = ()=>{
+    ctx.achatCart.splice(+b.dataset.removeAchatLigne, 1);
+    ctx.render();
+  });
+  const btnSaveAchat = document.getElementById('btn-save-achat');
+  if(btnSaveAchat) btnSaveAchat.onclick = ()=> ctx.withBusyButton(btnSaveAchat, async ()=>{
+    if(ctx.achatCart.length===0){ ctx.showToast('Ajoutez au moins un produit à la liste'); return; }
     const dateVal = document.getElementById('f-achat-date').value || todayISOLocal();
     const fournisseur = document.getElementById('f-achat-fournisseur').value.trim();
-    const quantite = parseInt(document.getElementById('f-achat-quantite').value)||0;
-    const prixTotal = parseFloat(document.getElementById('f-achat-prixtotal').value)||0;
-    const ajoutStock = document.getElementById('f-achat-ajoutstock').checked;
-    if(quantite<=0){ ctx.showToast('Quantité invalide'); return; }
-    const { data, error } = await supabase.rpc('rpc_add_achat', {
-      p_magasin_id: state.currentMagasinId, p_produit_id: produitId, p_date: dateVal,
-      p_fournisseur: fournisseur, p_quantite: quantite, p_prix_total: prixTotal, p_ajout_stock: ajoutStock
+    const { data, error } = await supabase.rpc('rpc_add_achats_groupe', {
+      p_magasin_id: state.currentMagasinId, p_date: dateVal, p_fournisseur: fournisseur,
+      p_items: ctx.achatCart.map(i=>({produit_id:i.produitId, quantite:i.quantite, prix_total:i.prixTotal}))
     });
     if(error){ ctx.showToast(ctx.friendlyError(error)); return; }
-    ctx.upsertRow('achats', data);
-    if(ajoutStock) p.quantiteDetail = (p.quantiteDetail||0) + quantite;
-    ctx.editing=null; ctx.showToast('Achat enregistré'); ctx.render();
-  };
+    (data||[]).forEach(row=>{
+      ctx.upsertRow('achats', row);
+      const p = state.produits.find(x=>x.id===row.produit_id);
+      if(p) p.quantiteDetail = (p.quantiteDetail||0) + row.quantite;
+    });
+    ctx.achatCart = [];
+    ctx.editing=null; ctx.showToast('Achat enregistré et stock mis à jour'); ctx.render();
+  });
 
   /* ---------------- Transfert entre magasins ---------------- */
   const btnNewTransfert = document.getElementById('btn-new-transfert');

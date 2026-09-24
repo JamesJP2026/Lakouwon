@@ -785,13 +785,29 @@ export function achatsFiltres(ctx){
   }
   return achats;
 }
+// Regroupe les lignes d'achat partageant le même achatGroupeId (une liste
+// d'achat validée d'un coup) en une seule entrée de journal. Les anciennes
+// lignes enregistrées avant ce regroupement (sans achatGroupeId) restent
+// affichées comme leur propre entrée à un seul produit.
+export function achatsGroupes(ctx){
+  const achats = achatsFiltres(ctx);
+  const groupes = {};
+  const ordre = [];
+  achats.forEach(a=>{
+    const cle = a.achatGroupeId || a.id;
+    if(!groupes[cle]){ groupes[cle] = { cle, date:a.date, fournisseur:a.fournisseur, employeId:a.employeId, lignes:[] }; ordre.push(cle); }
+    groupes[cle].lignes.push(a);
+  });
+  return ordre.map(cle=>groupes[cle]).sort((a,b)=>new Date(b.date)-new Date(a.date));
+}
 export function renderAchats(ctx){
   const { money, fmt } = ctx;
   const achats = achatsFiltres(ctx);
+  const groupes = achatsGroupes(ctx);
   const totalGeneral = achats.reduce((s,a)=>s+a.prixTotal,0);
   return `
   <div class="topbar">
-    <div><h1>Historique des achats</h1><p>Suivi des réapprovisionnements et achats fournisseurs</p></div>
+    <div><h1>Journal d'achat</h1><p>Chaque liste d'achat validée est ajoutée ici et son stock est incrémenté automatiquement</p></div>
     <div class="topbar-actions"><button class="btn btn-primary" id="btn-new-achat">+ Nouvel achat</button></div>
   </div>
   <div class="panel" style="padding:14px 16px; margin-bottom:14px;">
@@ -804,26 +820,62 @@ export function renderAchats(ctx){
   </div>
   <div class="kpi-row">
     <div class="kpi"><div class="lbl">Total des achats enregistrés</div><div class="val num">${money(totalGeneral)}</div></div>
-    <div class="kpi"><div class="lbl">Nombre d'achats</div><div class="val num">${achats.length}</div></div>
+    <div class="kpi"><div class="lbl">Nombre d'entrées au journal</div><div class="val num">${groupes.length}</div></div>
+    <div class="kpi"><div class="lbl">Nombre de produits achetés</div><div class="val num">${achats.length}</div></div>
   </div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Date</th><th>Produit</th><th>Fournisseur</th><th class="right">Quantité</th><th class="right">Prix unitaire</th><th class="right">Total</th><th>Par</th><th></th></tr></thead>
+      <thead><tr><th>Date</th><th class="right">Nb produits</th><th>Produits</th><th>Fournisseur</th><th class="right">Total</th><th>Par</th><th></th></tr></thead>
       <tbody>
-        ${achats.length? achats.map(a=>`
-          <tr>
-            <td class="muted">${new Date(a.date).toLocaleDateString('fr-FR')}</td>
-            <td><b>${a.nom}</b></td>
-            <td class="muted">${a.fournisseur||'—'}</td>
-            <td class="right num">${fmt(a.quantite)}</td>
-            <td class="right num">${money(a.quantite>0? a.prixTotal/a.quantite : 0)}</td>
-            <td class="right num">${money(a.prixTotal)}</td>
-            <td class="muted">${ctx.empName(a.employeId)}</td>
-            <td class="right"><button class="btn btn-sm btn-danger" data-del-achat="${a.id}">Suppr.</button></td>
-          </tr>`).join('') : `<tr><td colspan="8" class="empty">Aucun achat enregistré.</td></tr>`}
+        ${groupes.length? groupes.map(g=>{
+          const total = g.lignes.reduce((s,a)=>s+a.prixTotal,0);
+          const noms = g.lignes.map(a=>a.nom).join(', ');
+          return `<tr>
+            <td class="muted">${new Date(g.date).toLocaleDateString('fr-FR')}</td>
+            <td class="right num">${fmt(g.lignes.length)}</td>
+            <td style="max-width:280px;" title="${noms.replace(/"/g,'&quot;')}">${noms.length>60? noms.slice(0,60)+'…' : noms}</td>
+            <td class="muted">${g.fournisseur||'—'}</td>
+            <td class="right num">${money(total)}</td>
+            <td class="muted">${ctx.empName(g.employeId)}</td>
+            <td class="right">
+              <button class="btn btn-sm" data-voir-achat="${g.cle}">Voir</button>
+              <button class="btn btn-sm btn-danger" data-del-achat-groupe="${g.cle}">Suppr.</button>
+            </td>
+          </tr>`;
+        }).join('') : `<tr><td colspan="7" class="empty">Aucun achat enregistré.</td></tr>`}
       </tbody>
     </table>
   </div>`;
+}
+function modalVoirAchat(ctx){
+  const { money, fmt } = ctx;
+  const groupe = achatsGroupes(ctx).find(g=>g.cle===ctx.editing.id);
+  if(!groupe) return `<div class="overlay" id="overlay"><div class="modal"><div class="empty">Achat introuvable.</div><div class="modal-actions"><button class="btn" id="btn-cancel">Fermer</button></div></div></div>`;
+  const total = groupe.lignes.reduce((s,a)=>s+a.prixTotal,0);
+  return `<div class="overlay" id="overlay"><div class="modal wide">
+    <h2>Achat du ${new Date(groupe.date).toLocaleDateString('fr-FR')}</h2>
+    <div class="info-box">Fournisseur : ${groupe.fournisseur||'—'} &nbsp;·&nbsp; Enregistré par : ${ctx.empName(groupe.employeId)} &nbsp;·&nbsp; ${groupe.lignes.length} produit(s)</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Produit</th><th class="right">Qté</th><th class="right">Prix d'achat</th><th class="right">Prix vente détail</th><th class="right">Prix vente gros</th></tr></thead>
+        <tbody>
+          ${groupe.lignes.map(a=>{
+            const p = a.produitId ? ctx.state.produits.find(x=>x.id===a.produitId) : null;
+            const lotCaisse = p ? (p.lots||[]).find(l=>l.taille===(p.quantiteParCaisse||1)) : null;
+            return `<tr>
+              <td><b>${a.nom}</b></td>
+              <td class="right num">${fmt(a.quantite)}</td>
+              <td class="right num">${money(a.prixTotal)}</td>
+              <td class="right num">${p? money(p.prixVenteDetail) : '—'}</td>
+              <td class="right num">${lotCaisse? money(lotCaisse.prix) : '—'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="breakdown-row total" style="margin-top:8px;"><span>Total de l'achat</span><span class="num">${money(total)}</span></div>
+    <div class="modal-actions"><button class="btn" id="btn-cancel">Fermer</button></div>
+  </div></div>`;
 }
 
 /* ---------- EMPLOYES & PAIE ---------- */
@@ -1085,7 +1137,7 @@ export function renderModal(ctx){
   const fns = {produit:modalProduit, client:modalClient, employe:modalEmploye, payDette:modalPayDette,
     paySalaire:modalPaySalaire, caisseMouvement:modalCaisseMouvement, magasin:modalMagasin,
     confirmVente:modalConfirmVente, voirVente:modalVoirVente, payVente:modalPayVente, receiptPreview:modalReceiptPreview,
-    voirProforma:modalVoirProforma, confirmTransfert:modalConfirmTransfert, changePassword:modalChangePassword, achat:modalAchat};
+    voirProforma:modalVoirProforma, confirmTransfert:modalConfirmTransfert, changePassword:modalChangePassword, achat:modalAchat, voirAchat:modalVoirAchat};
   return fns[ctx.editing.type] ? fns[ctx.editing.type](ctx) : '';
 }
 
@@ -1472,23 +1524,47 @@ function modalVoirVente(ctx){
 }
 
 function modalAchat(ctx){
-  const produits = ctx.magasinProduits();
-  return `<div class="overlay" id="overlay"><div class="modal">
+  const { money, fmt } = ctx;
+  const produits = ctx.magasinProduits().filter(p=>!p.archive);
+  const cart = ctx.achatCart;
+  const totalGeneral = cart.reduce((s,i)=>s+i.prixTotal,0);
+  return `<div class="overlay" id="overlay"><div class="modal wide">
     <h2>Nouvel achat / réapprovisionnement</h2>
-    <div class="field"><label>Produit</label>
-      <select id="f-achat-produit">${produits.length? produits.map(p=>`<option value="${p.id}">${p.nom}</option>`).join('') : '<option value="">Aucun produit</option>'}</select>
-    </div>
     <div class="row2">
-      <div class="field"><label>Date</label><input type="date" id="f-achat-date" value="${todayISOLocal()}"></div>
-      <div class="field"><label>Fournisseur (optionnel)</label><input id="f-achat-fournisseur" placeholder="Ex: Distributeur XYZ"></div>
+      <div class="field"><label>Date</label><input type="date" id="f-achat-date" value="${ctx.achatDate||todayISOLocal()}"></div>
+      <div class="field"><label>Fournisseur (optionnel)</label><input id="f-achat-fournisseur" value="${ctx.achatFournisseur||''}" placeholder="Ex: Distributeur XYZ" spellcheck="true" lang="fr" autocorrect="on" autocapitalize="words"></div>
     </div>
-    <div class="row2">
-      <div class="field"><label>Quantité achetée (unités)</label><input type="number" id="f-achat-quantite" min="1" value="1"></div>
-      <div class="field"><label>Prix total payé</label><input type="number" id="f-achat-prixtotal" min="0" value="0"></div>
+    <div class="row2" style="align-items:end;">
+      <div class="field"><label>Produit</label>
+        <select id="f-achat-ligne-produit">${produits.length? produits.map(p=>`<option value="${p.id}">${p.nom}</option>`).join('') : '<option value="">Aucun produit</option>'}</select>
+      </div>
+      <div class="field"><label>Quantité (unités)</label><input type="number" id="f-achat-ligne-quantite" min="1" value="1"></div>
     </div>
-    <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; margin:10px 0;">
-      <input type="checkbox" id="f-achat-ajoutstock" checked> Ajouter cette quantité au stock du produit
-    </label>
-    <div class="modal-actions"><button class="btn" id="btn-cancel">Annuler</button><button class="btn btn-primary" id="btn-save-achat">Enregistrer</button></div>
+    <div class="row2" style="align-items:end;">
+      <div class="field"><label>Prix total payé (cette ligne)</label><input type="number" id="f-achat-ligne-prixtotal" min="0" value="0"></div>
+      <button type="button" class="btn btn-primary" id="btn-add-achat-ligne">+ Ajouter à la liste</button>
+    </div>
+    <div class="table-wrap" style="margin-top:12px;">
+      <table>
+        <thead><tr><th>Produit</th><th class="right">Qté</th><th class="right">Prix d'achat</th><th class="right">Prix détail</th><th class="right">Prix gros</th><th></th></tr></thead>
+        <tbody>
+          ${cart.length? cart.map((i,idx)=>{
+            const p = ctx.state.produits.find(x=>x.id===i.produitId);
+            const lotCaisse = p ? (p.lots||[]).find(l=>l.taille===(p.quantiteParCaisse||1)) : null;
+            return `<tr>
+              <td>${i.nom}</td>
+              <td class="right num">${fmt(i.quantite)}</td>
+              <td class="right num">${money(i.prixTotal)}</td>
+              <td class="right num">${p? money(p.prixVenteDetail) : '—'}</td>
+              <td class="right num">${lotCaisse? money(lotCaisse.prix) : '—'}</td>
+              <td class="right"><button type="button" class="btn btn-sm btn-danger" data-remove-achat-ligne="${idx}">✕</button></td>
+            </tr>`;
+          }).join('') : `<tr><td colspan="6" class="empty">Aucun produit ajouté à la liste.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+    <div class="breakdown-row total" style="margin-top:8px;"><span>Total de l'achat (${cart.length} produit${cart.length>1?'s':''})</span><span class="num">${money(totalGeneral)}</span></div>
+    <div class="muted" style="font-size:12px; margin-top:4px;">La quantité de chaque produit sera automatiquement ajoutée au stock dès que la liste sera validée.</div>
+    <div class="modal-actions"><button class="btn" id="btn-cancel">Annuler</button><button class="btn btn-primary" id="btn-save-achat" ${cart.length===0?'disabled':''}>${ctx.busy?'Traitement...':"✔ Valider l'achat"}</button></div>
   </div></div>`;
 }
