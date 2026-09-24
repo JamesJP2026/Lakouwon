@@ -153,10 +153,11 @@ begin
   v_monnaie := greatest(0, p_montant_recu - v_total);
   v_mode_final := case when v_reste > 0 then 'credit' else p_mode_paiement end;
   v_vente_id := gen_random_uuid();
-  -- Numéro séquentiel encodé en base 36 (chiffres + lettres) pour une
-  -- combinaison courte mais pas trop simple (ex: V2K7), sans risque de
-  -- collision puisqu'il vient d'un compteur global.
-  v_numero := 'V' || upper(to_base36(nextval('ventes_numero_seq')));
+  -- Numéro à 2 lettres aléatoires + 6 chiffres (ex: AB000042). L'unicité
+  -- vient uniquement de la partie chiffrée (compteur global), les lettres
+  -- ne servent qu'à varier l'apparence du numéro.
+  v_numero := chr(65+floor(random()*26)::int) || chr(65+floor(random()*26)::int)
+    || lpad(nextval('ventes_numero_seq')::text, 6, '0');
 
   insert into ventes (id, numero, magasin_id, date, items, total_brut, remise, total, cout_total,
     mode_paiement, montant_recu, monnaie_rendue, montant_paye, reste, client_id, employe_id, paiements, client_ref)
