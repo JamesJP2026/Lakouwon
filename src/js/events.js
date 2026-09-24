@@ -671,12 +671,16 @@ export function attachAllEvents(ctx){
     const nom = document.getElementById('f-nom').value.trim();
     if(!nom){ ctx.showToast('Le nom du produit est requis'); return; }
     const categorie = document.getElementById('f-categorie-select').value === '__new__' ? '' : document.getElementById('f-categorie-select').value;
+    const qpc = Math.max(1, parseInt(document.getElementById('f-quantiteParCaisse').value)||1);
+    const qcSaisie = Math.max(0, parseFloat(document.getElementById('f-quantiteCaisse').value)||0);
+    const quantiteCaisseEntiere = Math.floor(qcSaisie);
+    const detailDepuisFraction = Math.round((qcSaisie - quantiteCaisseEntiere) * qpc);
     const data = {
       nom,
       categorie,
-      quantite_par_caisse: Math.max(1, parseInt(document.getElementById('f-quantiteParCaisse').value)||1),
+      quantite_par_caisse: qpc,
       prix_achat: parseFloat(document.getElementById('f-prixAchat').value)||0,
-      quantite_caisse: parseInt(document.getElementById('f-quantiteCaisse').value)||0,
+      quantite_caisse: quantiteCaisseEntiere,
       prix_vente_detail: parseFloat(document.getElementById('f-prixVenteDetail').value)||0,
       stock_minimum: parseInt(document.getElementById('f-stockMinimum').value)||0,
       lots: ctx.productLotsDraft.filter(l=>l.taille>0 && l.prix>=0).map(l=>({id:l.id||ctx.uid(), taille:l.taille, prix:l.prix})),
@@ -690,17 +694,20 @@ export function attachAllEvents(ctx){
       data.lots.push({id:ctx.uid(), taille:data.quantite_par_caisse, prix:prixVenteGros});
     }
     if(ctx.editing.id){
+      const produitActuel = state.produits.find(x=>x.id===ctx.editing.id);
+      if(detailDepuisFraction>0) data.quantite_detail = (produitActuel.quantiteDetail||0) + detailDepuisFraction;
       const { error } = await supabase.from('produits').update(data).eq('id', ctx.editing.id);
       if(error){ ctx.showToast(ctx.friendlyError(error)); return; }
-      Object.assign(state.produits.find(x=>x.id===ctx.editing.id), {
+      Object.assign(produitActuel, {
         nom:data.nom, categorie:data.categorie, quantiteParCaisse:data.quantite_par_caisse, prixAchat:data.prix_achat,
-        quantiteCaisse:data.quantite_caisse, prixVenteDetail:data.prix_vente_detail, stockMinimum:data.stock_minimum, lots:data.lots
+        quantiteCaisse:data.quantite_caisse, prixVenteDetail:data.prix_vente_detail, stockMinimum:data.stock_minimum, lots:data.lots,
+        ...(data.quantite_detail!==undefined ? {quantiteDetail:data.quantite_detail} : {})
       });
       ctx.logAction('Produit modifié', data.nom);
     } else {
       data.magasin_id = state.currentMagasinId;
-      data.quantite_detail = 0;
-      data.stock_initial = data.quantite_caisse*data.quantite_par_caisse;
+      data.quantite_detail = detailDepuisFraction;
+      data.stock_initial = data.quantite_caisse*data.quantite_par_caisse + data.quantite_detail;
       data.archive = false;
       const { data: inserted, error } = await supabase.from('produits').insert(data).select().single();
       if(error){ ctx.showToast(ctx.friendlyError(error)); return; }

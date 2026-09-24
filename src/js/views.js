@@ -1170,9 +1170,9 @@ function modalProduit(ctx){
       <div class="field"><label>Prix d'achat (par caisse)${aide("Combien vous avez payé pour UNE caisse entière chez le fournisseur — pas le prix d'une seule unité.")}</label><input type="number" id="f-prixAchat" value="${p.prixAchat}" min="0"></div>
     </div>
     <div class="row2">
-      <div class="field"><label>Quantité de caisses en stock</label><input type="number" id="f-quantiteCaisse" value="${p.quantiteCaisse||0}" min="0"></div>
+      <div class="field"><label>Quantité de caisses en stock${aide("Vous pouvez entrer une valeur décimale si vous avez une caisse incomplète. Ex: 0.5 = une demi-caisse (les unités correspondantes seront ajoutées automatiquement).")}</label><input type="number" id="f-quantiteCaisse" value="${p.quantiteCaisse||0}" min="0" step="0.5"></div>
       <div class="field"><label>Unités en détail actuellement</label><input value="${ctx.fmt(p.quantiteDetail||0)} unité(s) — géré automatiquement" disabled>
-        <div class="muted" style="font-size:11px; margin-top:3px;">Se met à jour automatiquement lors des ventes (une caisse est ouverte si besoin). Non modifiable ici.</div>
+        <div class="muted" style="font-size:11px; margin-top:3px;">Se met à jour automatiquement lors des ventes (une caisse est ouverte si besoin), ou si vous entrez une caisse incomplète ci-contre.</div>
       </div>
     </div>
     <div class="row2">
