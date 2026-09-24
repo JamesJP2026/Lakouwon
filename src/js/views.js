@@ -221,6 +221,15 @@ export function generateReceiptHTML(ctx, vente){
 }
 
 /* ---------- FICHES DE VENTE ---------- */
+// Le mode de paiement enregistré sur la vente ("credit") reflète
+// comment elle a démarré, pas son état actuel : une fois la dette
+// entièrement remboursée (reste <= 0), on l'affiche comme payée.
+function venteModeBadgeHTML(v){
+  if(v.modePaiement==='credit' && v.reste<=0){
+    return `<span class="badge cash" title="Crédit entièrement remboursé">Payé</span>`;
+  }
+  return `<span class="badge ${v.modePaiement}">${v.modePaiement}</span>`;
+}
 export function fichesFiltrees(ctx){
   let ventes = ctx.magasinVentes().slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
   if(ctx.ficheSearch){
@@ -251,7 +260,7 @@ export function fichesTableHTML(ctx){
             <td><b>${v.numero}</b>${v.pendingSync? ' <span class="tag low" title="Faite hors-ligne, en attente d\'envoi au serveur">⏳ hors-ligne</span>' : ''}</td>
             <td class="muted">${new Date(v.date).toLocaleString('fr-FR')}</td>
             <td>${v.clientId? ctx.clientName(v.clientId) : '<span class="muted">Comptant</span>'}</td>
-            <td><span class="badge ${v.modePaiement}">${v.modePaiement}</span></td>
+            <td>${venteModeBadgeHTML(v)}</td>
             <td class="right num">${money(v.total)}</td>
             <td class="right num">${money(v.montantPaye)}</td>
             <td class="right num" style="${v.reste>0?'color:var(--red);font-weight:700;':''}">${money(v.reste)}</td>
@@ -1430,7 +1439,7 @@ function modalVoirVente(ctx){
     <h2>Fiche ${v.numero}</h2>
     <div class="info-box">
       Date : ${new Date(v.date).toLocaleString('fr-FR')} &nbsp;·&nbsp; Magasin : ${magasin?magasin.nom:''} &nbsp;·&nbsp; Caissier : ${ctx.empName(v.employeId)}<br>
-      Client : ${v.clientId? ctx.clientName(v.clientId) : 'Comptant'} &nbsp;·&nbsp; Mode : <span class="badge ${v.modePaiement}">${v.modePaiement}</span>
+      Client : ${v.clientId? ctx.clientName(v.clientId) : 'Comptant'} &nbsp;·&nbsp; Mode : ${venteModeBadgeHTML(v)}
     </div>
     <table>
       <thead><tr><th>Article</th><th>Type</th><th class="right">Qté</th><th class="right">Prix unit.</th><th class="right">Sous-total</th></tr></thead>
