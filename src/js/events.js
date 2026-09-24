@@ -352,6 +352,12 @@ export function attachAllEvents(ctx){
   const btnCE = document.getElementById('btn-caisse-entree'); if(btnCE) btnCE.onclick = ()=>{ ctx.editing={type:'caisseMouvement', mode:'entree'}; ctx.render(); };
   const btnCS = document.getElementById('btn-caisse-sortie'); if(btnCS) btnCS.onclick = ()=>{ ctx.editing={type:'caisseMouvement', mode:'sortie'}; ctx.render(); };
   const btnNewDepense = document.getElementById('btn-new-depense'); if(btnNewDepense) btnNewDepense.onclick = ()=>{ ctx.editing={type:'caisseMouvement', mode:'sortie'}; ctx.render(); };
+  const caisseDateDebutInp = document.getElementById('caisse-filtre-date-debut');
+  if(caisseDateDebutInp) caisseDateDebutInp.onchange = e=>{ ctx.caisseFiltreDateDebut = e.target.value; ctx.render(); };
+  const caisseDateFinInp = document.getElementById('caisse-filtre-date-fin');
+  if(caisseDateFinInp) caisseDateFinInp.onchange = e=>{ ctx.caisseFiltreDateFin = e.target.value; ctx.render(); };
+  const btnResetFiltresCaisse = document.getElementById('btn-reset-filtres-caisse');
+  if(btnResetFiltresCaisse) btnResetFiltresCaisse.onclick = ()=>{ ctx.caisseFiltreDateDebut=''; ctx.caisseFiltreDateFin=''; ctx.render(); };
 
   /* ---------------- Historique des achats ---------------- */
   const btnNewAchat = document.getElementById('btn-new-achat'); if(btnNewAchat) btnNewAchat.onclick = ()=>{ ctx.editing={type:'achat'}; ctx.render(); };
@@ -872,17 +878,22 @@ function attachCvDynamicEvents(ctx){
 function attachLotsEditorEvents(ctx, p){
   document.querySelectorAll('[data-lot-taille]').forEach(inp=>inp.oninput = ()=>{
     const idx = +inp.dataset.lotTaille;
-    const saisie = parseFloat(inp.value)||0;
-    const estFraction = !Number.isInteger(saisie);
-    const qpcChamp = document.getElementById('f-quantiteParCaisse');
-    const qpc = Math.max(1, parseInt(qpcChamp?.value)||p.quantiteParCaisse||1);
-    ctx.productLotsDraft[idx].taille = estFraction ? Math.round(saisie * qpc) : saisie;
+    ctx.productLotsDraft[idx].taille = parseInt(inp.value)||0;
     const span = document.getElementById('lot-margin-'+idx);
     if(span) span.textContent = lotMarginText(ctx, p, ctx.productLotsDraft[idx].taille, ctx.productLotsDraft[idx].prix);
   });
-  document.querySelectorAll('[data-lot-taille]').forEach(inp=>inp.onblur = ()=>{
-    const idx = +inp.dataset.lotTaille;
-    inp.value = ctx.productLotsDraft[idx].taille;
+  document.querySelectorAll('[data-lot-fraction]').forEach(inp=>inp.oninput = ()=>{
+    const idx = +inp.dataset.lotFraction;
+    const fraction = parseFloat(inp.value)||0;
+    if(fraction<=0) return;
+    const qpcChamp = document.getElementById('f-quantiteParCaisse');
+    const qpc = Math.max(1, parseInt(qpcChamp?.value)||p.quantiteParCaisse||1);
+    const taille = Math.round(fraction * qpc);
+    ctx.productLotsDraft[idx].taille = taille;
+    const tailleInput = document.querySelector(`[data-lot-taille="${idx}"]`);
+    if(tailleInput) tailleInput.value = taille;
+    const span = document.getElementById('lot-margin-'+idx);
+    if(span) span.textContent = lotMarginText(ctx, p, taille, ctx.productLotsDraft[idx].prix);
   });
   document.querySelectorAll('[data-lot-prix]').forEach(inp=>inp.oninput = ()=>{
     const idx = +inp.dataset.lotPrix;

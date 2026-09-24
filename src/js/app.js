@@ -175,6 +175,8 @@ let ficheFiltreMode = '';
 let ficheFiltreEmployeId = '';
 let achatFiltreDateDebut = '';
 let achatFiltreDateFin = '';
+let caisseFiltreDateDebut = '';
+let caisseFiltreDateFin = '';
 let inventaireSearch = '';
 let inventaireComptages = {};
 let productLotsDraft = [];
@@ -829,6 +831,8 @@ function ctx(){
     get ficheFiltreEmployeId(){return ficheFiltreEmployeId;}, set ficheFiltreEmployeId(v){ficheFiltreEmployeId=v;},
     get achatFiltreDateDebut(){return achatFiltreDateDebut;}, set achatFiltreDateDebut(v){achatFiltreDateDebut=v;},
     get achatFiltreDateFin(){return achatFiltreDateFin;}, set achatFiltreDateFin(v){achatFiltreDateFin=v;},
+    get caisseFiltreDateDebut(){return caisseFiltreDateDebut;}, set caisseFiltreDateDebut(v){caisseFiltreDateDebut=v;},
+    get caisseFiltreDateFin(){return caisseFiltreDateFin;}, set caisseFiltreDateFin(v){caisseFiltreDateFin=v;},
     get inventaireSearch(){return inventaireSearch;}, set inventaireSearch(v){inventaireSearch=v;},
     get inventaireComptages(){return inventaireComptages;}, set inventaireComptages(v){inventaireComptages=v;},
     persistInventaireDraft,

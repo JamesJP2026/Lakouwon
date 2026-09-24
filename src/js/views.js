@@ -528,9 +528,21 @@ export function renderClients(ctx){
 }
 
 /* ---------- CAISSE ---------- */
+export function caisseMouvementsFiltres(ctx){
+  let movs = ctx.magasinCaisse().slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+  if(ctx.caisseFiltreDateDebut){
+    const debut = new Date(ctx.caisseFiltreDateDebut); debut.setHours(0,0,0,0);
+    movs = movs.filter(m=> new Date(m.date) >= debut);
+  }
+  if(ctx.caisseFiltreDateFin){
+    const fin = new Date(ctx.caisseFiltreDateFin); fin.setHours(23,59,59,999);
+    movs = movs.filter(m=> new Date(m.date) <= fin);
+  }
+  return movs;
+}
 export function renderCaisse(ctx){
   const { money } = ctx;
-  const movs = ctx.magasinCaisse().slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const movs = caisseMouvementsFiltres(ctx);
   const entrees = movs.filter(m=>m.type==='entree').reduce((s,m)=>s+m.montant,0);
   const sorties = movs.filter(m=>m.type==='sortie').reduce((s,m)=>s+m.montant,0);
   return `
@@ -539,6 +551,13 @@ export function renderCaisse(ctx){
     <div class="topbar-actions">
       <button class="btn" id="btn-caisse-entree">+ Entrée manuelle</button>
       <button class="btn btn-danger" id="btn-caisse-sortie">+ Sortie / Dépense</button>
+    </div>
+  </div>
+  <div class="panel" style="padding:14px 16px; margin-bottom:14px;">
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+      <div class="field" style="margin:0;"><label>Du</label><input type="date" id="caisse-filtre-date-debut" value="${ctx.caisseFiltreDateDebut}"></div>
+      <div class="field" style="margin:0;"><label>Au</label><input type="date" id="caisse-filtre-date-fin" value="${ctx.caisseFiltreDateFin}"></div>
+      <button class="btn btn-sm" id="btn-reset-filtres-caisse">✕ Réinitialiser</button>
     </div>
   </div>
   <div class="kpi-row">
@@ -1129,8 +1148,9 @@ function lotMarginText(ctx, p, taille, prix){
 export function lotsEditorHTML(ctx, p){
   return ctx.productLotsDraft.map((l,idx)=>`
     <div class="row2" style="align-items:end; margin-bottom:6px; background:#f8f6f0; padding:8px; border-radius:8px;">
-      <div class="field" style="margin-bottom:0;"><label>Taille du lot (unités)${aide("Entrez un nombre entier pour une taille en unités, ou une valeur décimale pour une fraction de caisse. Ex: 0.5 = une demi-caisse, converti automatiquement en unités.")}</label><input type="number" min="0" step="0.5" data-lot-taille="${idx}" value="${l.taille||0}"></div>
+      <div class="field" style="margin-bottom:0;"><label>Taille du lot (unités)</label><input type="number" min="1" data-lot-taille="${idx}" value="${l.taille||0}"></div>
       <div class="field" style="margin-bottom:0;"><label>Prix du lot</label><input type="number" min="0" data-lot-prix="${idx}" value="${l.prix||0}"></div>
+      <div class="field" style="margin-bottom:0; grid-column:1/-1;"><label>Ou en fraction de caisse${aide("Ex: 0.5 = une demi-caisse. Remplit automatiquement la taille en unités ci-dessus selon la quantité par caisse du produit.")}</label><input type="number" min="0" step="0.5" placeholder="Ex: 0.5" data-lot-fraction="${idx}"></div>
       <div style="grid-column:1/-1; display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
         <span class="muted" id="lot-margin-${idx}" style="font-size:11.5px;">${lotMarginText(ctx, p, l.taille||0, l.prix||0)}</span>
         <button type="button" class="btn btn-sm btn-danger" data-remove-lot="${idx}">Retirer</button>
