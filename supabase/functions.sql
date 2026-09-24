@@ -131,23 +131,16 @@ begin
   v_monnaie := greatest(0, p_montant_recu - v_total);
   v_mode_final := case when v_reste > 0 then 'credit' else p_mode_paiement end;
   v_vente_id := gen_random_uuid();
+  -- Numéro court et séquentiel (ex: V1042) — un compteur global garantit
+  -- l'unicité sans avoir besoin de caractères aléatoires.
+  v_numero := 'V' || nextval('ventes_numero_seq');
 
-  -- Numéro court (ex: V250924A1F3) : date du jour + 4 caractères aléatoires.
-  -- En cas de collision (extrêmement rare), on retente avec un nouveau numéro.
-  loop
-    v_numero := 'V' || to_char(now(),'YYMMDD') || upper(substr(md5(random()::text || clock_timestamp()::text),1,4));
-    begin
-      insert into ventes (id, numero, magasin_id, date, items, total_brut, remise, total, cout_total,
-        mode_paiement, montant_recu, monnaie_rendue, montant_paye, reste, client_id, employe_id, paiements, client_ref)
-      values (v_vente_id, v_numero, p_magasin_id, now(), v_items_out, v_total_brut, v_remise, v_total, v_cout_total,
-        v_mode_final, p_montant_recu, v_monnaie, v_montant_paye, v_reste,
-        case when v_reste > 0 or p_client_id is not null then p_client_id else null end,
-        v_employe.id, '[]'::jsonb, p_client_ref);
-      exit;
-    exception when unique_violation then
-      -- boucle : un autre numéro sera généré
-    end;
-  end loop;
+  insert into ventes (id, numero, magasin_id, date, items, total_brut, remise, total, cout_total,
+    mode_paiement, montant_recu, monnaie_rendue, montant_paye, reste, client_id, employe_id, paiements, client_ref)
+  values (v_vente_id, v_numero, p_magasin_id, now(), v_items_out, v_total_brut, v_remise, v_total, v_cout_total,
+    v_mode_final, p_montant_recu, v_monnaie, v_montant_paye, v_reste,
+    case when v_reste > 0 or p_client_id is not null then p_client_id else null end,
+    v_employe.id, '[]'::jsonb, p_client_ref);
 
   if p_mode_paiement = 'cash' then
     if p_montant_recu > 0 then

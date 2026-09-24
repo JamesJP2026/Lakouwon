@@ -107,6 +107,8 @@ create index if not exists idx_clients_magasin on clients(magasin_id);
 -- ---------------------------------------------------------
 -- VENTES (fiches de vente)
 -- ---------------------------------------------------------
+create sequence if not exists ventes_numero_seq;
+
 create table if not exists ventes (
   id uuid primary key default gen_random_uuid(),
   numero text not null unique,
