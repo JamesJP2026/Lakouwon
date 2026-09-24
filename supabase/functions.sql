@@ -16,6 +16,28 @@
 -- =========================================================
 
 -- ---------------------------------------------------------
+-- to_base36 — convertit un entier en base 36 (chiffres + lettres),
+-- utilisé pour générer des numéros de fiche courts mais variés
+-- (combinaison de lettres/chiffres) à partir d'un compteur séquentiel.
+-- ---------------------------------------------------------
+create or replace function to_base36(n bigint) returns text
+language plpgsql immutable as $$
+declare
+  chars text := '0123456789abcdefghijklmnopqrstuvwxyz';
+  result text := '';
+  reste bigint;
+begin
+  if n = 0 then return '0'; end if;
+  while n > 0 loop
+    reste := n % 36;
+    result := substr(chars, (reste+1)::int, 1) || result;
+    n := n / 36;
+  end loop;
+  return result;
+end;
+$$;
+
+-- ---------------------------------------------------------
 -- rpc_finalize_sale — encaissement d'une nouvelle vente
 -- p_items: [{"produit_id":"uuid","mode":"detail"|"gros","lot_id":"uuid|null","qte":n}]
 -- ---------------------------------------------------------
@@ -131,9 +153,10 @@ begin
   v_monnaie := greatest(0, p_montant_recu - v_total);
   v_mode_final := case when v_reste > 0 then 'credit' else p_mode_paiement end;
   v_vente_id := gen_random_uuid();
-  -- Numéro court et séquentiel (ex: V1042) — un compteur global garantit
-  -- l'unicité sans avoir besoin de caractères aléatoires.
-  v_numero := 'V' || nextval('ventes_numero_seq');
+  -- Numéro séquentiel encodé en base 36 (chiffres + lettres) pour une
+  -- combinaison courte mais pas trop simple (ex: V2K7), sans risque de
+  -- collision puisqu'il vient d'un compteur global.
+  v_numero := 'V' || upper(to_base36(nextval('ventes_numero_seq')));
 
   insert into ventes (id, numero, magasin_id, date, items, total_brut, remise, total, cout_total,
     mode_paiement, montant_recu, monnaie_rendue, montant_paye, reste, client_id, employe_id, paiements, client_ref)
