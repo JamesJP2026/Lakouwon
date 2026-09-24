@@ -1364,7 +1364,11 @@ function cvDynamicHTML(ctx){
   const insuffisant = !isPartial && recu<total;
   const clients = ctx.magasinClients();
   if(!isPartial){
-    return `<div class="breakdown-row total"><span>Monnaie à remettre</span><span class="num" style="color:var(--green);">${ctx.money(monnaie)}</span></div>
+    return `
+    <div class="field"><label>Client (optionnel)</label>
+      <select id="f-cv-client"><option value="">— Vente sans client enregistré —</option>${clients.map(c=>`<option value="${c.id}" ${ctx.posClientId===c.id?'selected':''}>${c.nom}</option>`).join('')}</select>
+    </div>
+    <div class="breakdown-row total"><span>Monnaie à remettre</span><span class="num" style="color:var(--green);">${ctx.money(monnaie)}</span></div>
       ${insuffisant? `<div class="muted" style="color:var(--red); font-size:12.5px; margin-top:4px;">Le montant reçu est inférieur au total. Cochez "Paiement partiel" si le client ne paie pas tout.</div>` : ''}`;
   }
   return `
