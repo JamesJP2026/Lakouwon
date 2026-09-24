@@ -1129,7 +1129,7 @@ function lotMarginText(ctx, p, taille, prix){
 export function lotsEditorHTML(ctx, p){
   return ctx.productLotsDraft.map((l,idx)=>`
     <div class="row2" style="align-items:end; margin-bottom:6px; background:#f8f6f0; padding:8px; border-radius:8px;">
-      <div class="field" style="margin-bottom:0;"><label>Taille du lot (unités)</label><input type="number" min="1" data-lot-taille="${idx}" value="${l.taille||0}"></div>
+      <div class="field" style="margin-bottom:0;"><label>Taille du lot (unités)${aide("Entrez un nombre entier pour une taille en unités, ou une valeur décimale pour une fraction de caisse. Ex: 0.5 = une demi-caisse, converti automatiquement en unités.")}</label><input type="number" min="0" step="0.5" data-lot-taille="${idx}" value="${l.taille||0}"></div>
       <div class="field" style="margin-bottom:0;"><label>Prix du lot</label><input type="number" min="0" data-lot-prix="${idx}" value="${l.prix||0}"></div>
       <div style="grid-column:1/-1; display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
         <span class="muted" id="lot-margin-${idx}" style="font-size:11.5px;">${lotMarginText(ctx, p, l.taille||0, l.prix||0)}</span>

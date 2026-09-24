@@ -872,9 +872,17 @@ function attachCvDynamicEvents(ctx){
 function attachLotsEditorEvents(ctx, p){
   document.querySelectorAll('[data-lot-taille]').forEach(inp=>inp.oninput = ()=>{
     const idx = +inp.dataset.lotTaille;
-    ctx.productLotsDraft[idx].taille = parseInt(inp.value)||0;
+    const saisie = parseFloat(inp.value)||0;
+    const estFraction = !Number.isInteger(saisie);
+    const qpcChamp = document.getElementById('f-quantiteParCaisse');
+    const qpc = Math.max(1, parseInt(qpcChamp?.value)||p.quantiteParCaisse||1);
+    ctx.productLotsDraft[idx].taille = estFraction ? Math.round(saisie * qpc) : saisie;
     const span = document.getElementById('lot-margin-'+idx);
     if(span) span.textContent = lotMarginText(ctx, p, ctx.productLotsDraft[idx].taille, ctx.productLotsDraft[idx].prix);
+  });
+  document.querySelectorAll('[data-lot-taille]').forEach(inp=>inp.onblur = ()=>{
+    const idx = +inp.dataset.lotTaille;
+    inp.value = ctx.productLotsDraft[idx].taille;
   });
   document.querySelectorAll('[data-lot-prix]').forEach(inp=>inp.oninput = ()=>{
     const idx = +inp.dataset.lotPrix;
