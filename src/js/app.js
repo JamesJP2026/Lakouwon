@@ -71,16 +71,20 @@ function periodBounds(p){
   return new Date(2000,0,1);
 }
 function unitsConsumed(item){ return item.mode==='gros' ? item.qte*item.uniteParLot : item.qte; }
-function cartTotal(items){ return items.reduce((s,i)=>s+i.qte*i.prixVente,0); }
-function cartCost(items){ return items.reduce((s,i)=>s+i.qte*i.coutUnitaire,0); }
+// Arrondit à 2 décimales pour éviter les faux "montant insuffisant" causés
+// par l'imprécision des nombres flottants (ex: 149.99999999999997 au lieu
+// de 150), le montant reçu étant lui toujours un nombre "rond" saisi à la main.
+function round2(n){ return Math.round((n + Number.EPSILON) * 100) / 100; }
+function cartTotal(items){ return round2(items.reduce((s,i)=>s+i.qte*i.prixVente,0)); }
+function cartCost(items){ return round2(items.reduce((s,i)=>s+i.qte*i.coutUnitaire,0)); }
 function remiseMontant(totalBrut){
   if(posRemiseValeur<=0) return 0;
   const m = posRemiseType==='pourcentage' ? totalBrut*(posRemiseValeur/100) : posRemiseValeur;
-  return Math.max(0, Math.min(m, totalBrut));
+  return round2(Math.max(0, Math.min(m, totalBrut)));
 }
 function venteTotalNet(){
   const brut = cartTotal(cart);
-  return Math.max(0, brut - remiseMontant(brut));
+  return round2(Math.max(0, brut - remiseMontant(brut)));
 }
 function remiseSummaryHTML(){
   const brut = cartTotal(cart);
