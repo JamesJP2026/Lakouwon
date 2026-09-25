@@ -974,7 +974,7 @@ async function finalizeSale(ctx, montantRecuConfirme){
   if(ctx.editingVenteId){
     const result = await ctx.supabase.rpc('rpc_modifier_vente', { p_vente_id: ctx.editingVenteId, ...params });
     ctx.busy = false;
-    if(result.error){ ctx.showToast(ctx.friendlyError(result.error)); ctx.render(); return; }
+    if(result.error){ alert(ctx.friendlyError(result.error)); ctx.render(); return; }
     const vente = ctx.upsertRow('ventes', result.data);
     ctx.editingVenteId = null; ctx.editingVenteNumero = null;
     ctx.cart = []; ctx.posPayMode='cash'; ctx.posClientId=''; ctx.posDepositMode='cash'; ctx.posMontantRecu=0; ctx.posRemiseType='montant'; ctx.posRemiseValeur=0;
@@ -1000,7 +1000,7 @@ async function finalizeSale(ctx, montantRecuConfirme){
   }
 
   ctx.busy = false;
-  if(result.error){ ctx.showToast(ctx.friendlyError(result.error)); ctx.render(); return; }
+  if(result.error){ alert(ctx.friendlyError(result.error)); ctx.render(); return; }
   const vente = ctx.upsertRow('ventes', result.data);
   ctx.cart = []; ctx.posPayMode='cash'; ctx.posClientId=''; ctx.posDepositMode='cash'; ctx.posMontantRecu=0; ctx.posRemiseType='montant'; ctx.posRemiseValeur=0;
   ctx.showToast('Vente enregistrée avec succès');
