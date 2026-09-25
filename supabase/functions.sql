@@ -100,16 +100,21 @@ begin
     select * into v_produit from produits where id = v_produit_id and magasin_id = p_magasin_id for update;
     if not found then raise exception 'Produit introuvable'; end if;
 
+    -- Le prix de vente vient de la fiche telle qu'affichée au client (figé
+    -- au moment de la mise au panier), pas du prix actuel du produit : un
+    -- changement de prix en cours de vente ne doit jamais faire échouer ou
+    -- changer le montant d'une transaction déjà annoncée au client. Le coût
+    -- (pour la marge) reste calculé à partir du prix d'achat actuel.
+    v_prix_vente := (v_item->>'prix_vente')::numeric;
+    if v_prix_vente is null or v_prix_vente < 0 then raise exception 'Prix de vente invalide pour %', v_produit.nom; end if;
     if (v_item->>'mode') = 'gros' then
       select l into v_lot from jsonb_array_elements(v_produit.lots) l where l->>'id' = (v_item->>'lot_id') limit 1;
       if v_lot is null then raise exception 'Lot introuvable pour %', v_produit.nom; end if;
       v_unite_par_lot := (v_lot->>'taille')::int;
-      v_prix_vente := (v_lot->>'prix')::numeric;
       v_cout_unitaire := (v_produit.prix_achat / greatest(v_produit.quantite_par_caisse,1)) * v_unite_par_lot;
       v_nom := v_produit.nom || ' — Lot de ' || v_unite_par_lot;
     else
       v_unite_par_lot := 1;
-      v_prix_vente := v_produit.prix_vente_detail;
       v_cout_unitaire := v_produit.prix_achat / greatest(v_produit.quantite_par_caisse,1);
       v_nom := v_produit.nom;
     end if;
@@ -252,16 +257,21 @@ begin
     select * into v_produit from produits where id = v_produit_id and magasin_id = v_old.magasin_id for update;
     if not found then raise exception 'Produit introuvable'; end if;
 
+    -- Le prix de vente vient de la fiche telle qu'affichée au client (figé
+    -- au moment de la mise au panier), pas du prix actuel du produit : un
+    -- changement de prix en cours de vente ne doit jamais faire échouer ou
+    -- changer le montant d'une transaction déjà annoncée au client. Le coût
+    -- (pour la marge) reste calculé à partir du prix d'achat actuel.
+    v_prix_vente := (v_item->>'prix_vente')::numeric;
+    if v_prix_vente is null or v_prix_vente < 0 then raise exception 'Prix de vente invalide pour %', v_produit.nom; end if;
     if (v_item->>'mode') = 'gros' then
       select l into v_lot from jsonb_array_elements(v_produit.lots) l where l->>'id' = (v_item->>'lot_id') limit 1;
       if v_lot is null then raise exception 'Lot introuvable pour %', v_produit.nom; end if;
       v_unite_par_lot := (v_lot->>'taille')::int;
-      v_prix_vente := (v_lot->>'prix')::numeric;
       v_cout_unitaire := (v_produit.prix_achat / greatest(v_produit.quantite_par_caisse,1)) * v_unite_par_lot;
       v_nom := v_produit.nom || ' — Lot de ' || v_unite_par_lot;
     else
       v_unite_par_lot := 1;
-      v_prix_vente := v_produit.prix_vente_detail;
       v_cout_unitaire := v_produit.prix_achat / greatest(v_produit.quantite_par_caisse,1);
       v_nom := v_produit.nom;
     end if;
