@@ -144,7 +144,7 @@ begin
   -- Marge d'un centime pour absorber les arrondis (le montant reçu est
   -- toujours saisi par l'employé en chiffres "ronds").
   if not p_encaissement_partiel and p_montant_recu < v_total - 0.01 then
-    raise exception 'Montant reçu insuffisant';
+    raise exception 'Montant reçu insuffisant (reçu: %, total calculé: %, sous-total: %, remise: %)', p_montant_recu, v_total, v_total_brut, v_remise;
   end if;
   if p_encaissement_partiel and p_client_id is null then
     raise exception 'Un client est requis pour un encaissement partiel';
@@ -293,7 +293,7 @@ begin
     else greatest(0, least(p_remise_valeur, v_total_brut)) end, 2);
   v_total := round(greatest(0, v_total_brut - v_remise), 2);
 
-  if not p_encaissement_partiel and p_montant_recu < v_total - 0.01 then raise exception 'Montant reçu insuffisant'; end if;
+  if not p_encaissement_partiel and p_montant_recu < v_total - 0.01 then raise exception 'Montant reçu insuffisant (reçu: %, total calculé: %, sous-total: %, remise: %)', p_montant_recu, v_total, v_total_brut, v_remise; end if;
   if p_encaissement_partiel and p_client_id is null then raise exception 'Un client est requis pour un encaissement partiel'; end if;
 
   v_reste := case when p_encaissement_partiel then greatest(0, v_total - p_montant_recu) else 0 end;
