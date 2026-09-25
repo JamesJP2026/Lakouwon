@@ -136,12 +136,14 @@ begin
       'qte', v_qte, 'uniteParLot', v_unite_par_lot, 'prixVente', v_prix_vente, 'coutUnitaire', v_cout_unitaire));
   end loop;
 
-  v_remise := case when p_remise_valeur is null or p_remise_valeur <= 0 then 0
+  v_remise := round(case when p_remise_valeur is null or p_remise_valeur <= 0 then 0
     when p_remise_type = 'pourcentage' then greatest(0, least(v_total_brut * (p_remise_valeur/100.0), v_total_brut))
-    else greatest(0, least(p_remise_valeur, v_total_brut)) end;
-  v_total := greatest(0, v_total_brut - v_remise);
+    else greatest(0, least(p_remise_valeur, v_total_brut)) end, 2);
+  v_total := round(greatest(0, v_total_brut - v_remise), 2);
 
-  if not p_encaissement_partiel and p_montant_recu < v_total then
+  -- Marge d'un centime pour absorber les arrondis (le montant reçu est
+  -- toujours saisi par l'employé en chiffres "ronds").
+  if not p_encaissement_partiel and p_montant_recu < v_total - 0.01 then
     raise exception 'Montant reçu insuffisant';
   end if;
   if p_encaissement_partiel and p_client_id is null then
@@ -286,12 +288,12 @@ begin
       'qte', v_qte, 'uniteParLot', v_unite_par_lot, 'prixVente', v_prix_vente, 'coutUnitaire', v_cout_unitaire));
   end loop;
 
-  v_remise := case when p_remise_valeur is null or p_remise_valeur <= 0 then 0
+  v_remise := round(case when p_remise_valeur is null or p_remise_valeur <= 0 then 0
     when p_remise_type = 'pourcentage' then greatest(0, least(v_total_brut * (p_remise_valeur/100.0), v_total_brut))
-    else greatest(0, least(p_remise_valeur, v_total_brut)) end;
-  v_total := greatest(0, v_total_brut - v_remise);
+    else greatest(0, least(p_remise_valeur, v_total_brut)) end, 2);
+  v_total := round(greatest(0, v_total_brut - v_remise), 2);
 
-  if not p_encaissement_partiel and p_montant_recu < v_total then raise exception 'Montant reçu insuffisant'; end if;
+  if not p_encaissement_partiel and p_montant_recu < v_total - 0.01 then raise exception 'Montant reçu insuffisant'; end if;
   if p_encaissement_partiel and p_client_id is null then raise exception 'Un client est requis pour un encaissement partiel'; end if;
 
   v_reste := case when p_encaissement_partiel then greatest(0, v_total - p_montant_recu) else 0 end;
