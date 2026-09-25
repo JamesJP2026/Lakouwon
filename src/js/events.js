@@ -81,6 +81,7 @@ export function attachAllEvents(ctx){
   const btnEncaisser = document.getElementById('btn-encaisser');
   if(btnEncaisser) btnEncaisser.onclick = ()=>{
     if(ctx.cart.length===0) return;
+    syncCartPrices(ctx);
     ctx.posEncaissementPartiel = ctx.posPayMode==='credit';
     ctx.posMontantRecu = ctx.posPayMode==='credit' ? 0 : ctx.venteTotalNet();
     ctx.posDepositMode = (ctx.posPayMode==='cash'||ctx.posPayMode==='banque'||ctx.posPayMode==='moncash') ? ctx.posPayMode : 'cash';
@@ -932,6 +933,25 @@ function attachLotsEditorEvents(ctx, p){
 /* =========================================================
    ACTIONS MÉTIER (appels RPC)
 ========================================================= */
+// Un prix peut avoir changé (par un autre employé, sur un autre appareil)
+// entre le moment où le produit est ajouté au panier et l'encaissement.
+// Le serveur recalcule toujours le total à partir des prix actuels ; on
+// resynchronise donc le panier juste avant d'afficher le total à
+// encaisser, pour que le montant demandé au client soit le bon dès le
+// départ plutôt que de découvrir l'écart après coup ("Montant insuffisant").
+function syncCartPrices(ctx){
+  ctx.cart.forEach(i=>{
+    const p = ctx.state.produits.find(x=>x.id===i.produitId);
+    if(!p) return;
+    if(i.mode==='gros'){
+      const lot = (p.lots||[]).find(l=>l.id===i.lotId);
+      if(lot){ i.prixVente = lot.prix; i.uniteParLot = lot.taille; i.coutUnitaire = ctx.coutUnitaire(p)*lot.taille; }
+    } else {
+      i.prixVente = p.prixVenteDetail;
+      i.coutUnitaire = ctx.coutUnitaire(p);
+    }
+  });
+}
 function addToCart(ctx, prodId){
   const p = ctx.state.produits.find(x=>x.id===prodId);
   if(!p) return;
