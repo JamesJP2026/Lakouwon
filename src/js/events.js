@@ -882,10 +882,11 @@ export function attachAllEvents(ctx){
   if(btnSaveCaisse) btnSaveCaisse.onclick = async ()=>{
     const motif = document.getElementById('f-motif').value.trim();
     const montant = parseFloat(document.getElementById('f-montant').value)||0;
+    const dateVal = document.getElementById('f-caisse-date').value || todayISOLocal();
     if(!motif || montant<=0){ ctx.showToast('Motif et montant requis'); return; }
     const { data, error } = await supabase.from('caisse_movements').insert({
       magasin_id: state.currentMagasinId, type: ctx.editing.mode, montant, motif,
-      employe_id: ctx.currentUser().id, source:'manuel'
+      employe_id: ctx.currentUser().id, source:'manuel', date: new Date(dateVal+'T12:00:00').toISOString()
     }).select().single();
     if(error){ ctx.showToast(ctx.friendlyError(error)); return; }
     ctx.upsertRow('caisse_movements', data);

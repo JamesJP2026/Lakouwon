@@ -1423,7 +1423,10 @@ function modalCaisseMouvement(ctx){
   return `<div class="overlay" id="overlay"><div class="modal">
     <h2>${isEntree?'Entrée de caisse':'Sortie de caisse / Dépense'}</h2>
     <div class="field"><label>Motif</label><input id="f-motif" placeholder="${isEntree?'Ex: Apport de fonds':'Ex: Achat fournitures, loyer...'}" spellcheck="true" lang="fr" autocorrect="on" autocapitalize="sentences"></div>
-    <div class="field"><label>Montant</label><input type="number" id="f-montant" min="0" value="0"></div>
+    <div class="row2">
+      <div class="field"><label>Montant</label><input type="number" id="f-montant" min="0" value="0"></div>
+      <div class="field"><label>Date</label><input type="date" id="f-caisse-date" value="${todayISOLocal()}"></div>
+    </div>
     <div class="modal-actions"><button class="btn" id="btn-cancel">Annuler</button><button class="btn btn-primary" id="btn-save-caisse">Enregistrer</button></div>
   </div></div>`;
 }
