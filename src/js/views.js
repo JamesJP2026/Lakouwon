@@ -343,6 +343,7 @@ export function renderProduits(ctx){
       const total = ctx.stockUnites(p);
       const bas = total <= (p.stockMinimum||0);
       const lots = p.lots||[];
+      const lotCaisse = lots.find(l=>l.taille===(p.quantiteParCaisse||1));
       return `<div class="product-card" data-name="${(p.nom+' '+(p.categorie||'')).toLowerCase()}" data-cat="${p.categorie||'__none__'}" style="${p.archive?'opacity:.6;':''}">
         <div class="pc-head">
           <div class="pc-name">${p.nom} ${p.archive?'<span class="badge role-Caissier">Archivé</span>':''}</div>
@@ -350,14 +351,15 @@ export function renderProduits(ctx){
         </div>
         <div class="pc-cat muted">${p.categorie||'Sans catégorie'}</div>
         <div class="cc-stats">
-          <div><span class="muted">Achat (caisse)</span><br><b class="num">${money(p.prixAchat)}</b></div>
-          <div style="text-align:right;"><span class="muted">Détail</span><br><b class="num">${money(p.prixVenteDetail)}</b></div>
+          <div><span class="muted">Détail</span><br><b class="num">${money(p.prixVenteDetail)}</b></div>
+          <div style="text-align:right;"><span class="muted">Gros (caisse)</span><br><b class="num">${lotCaisse? money(lotCaisse.prix) : '—'}</b></div>
         </div>
         <div class="pc-lots">
           <span class="muted" style="font-size:11.5px;">Prix de gros :</span><br>
           ${lots.length? lots.map(l=>`<span class="badge cash" style="margin:3px 3px 0 0;">${l.taille}u — ${money(l.prix)}</span>`).join('') : '<span class="muted" style="font-size:12px;">Non configuré</span>'}
         </div>
         <div class="pc-meta muted">${fmt(p.quantiteCaisse||0)}×${fmt(p.quantiteParCaisse||0)} + ${fmt(p.quantiteDetail||0)} détail · Seuil min ${fmt(p.stockMinimum||0)}</div>
+        <div class="pc-meta muted" style="margin-top:2px;">Prix d'achat (caisse) : <b class="num">${money(p.prixAchat)}</b></div>
         <div class="cc-actions">
           <button class="btn btn-sm" data-edit-produit="${p.id}">Modifier</button>
           ${p.archive?
