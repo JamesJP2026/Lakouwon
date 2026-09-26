@@ -389,6 +389,7 @@ function restoreInventaireDraft(){
 const OFFLINE_CACHE_KEY = 'lakouwon_offline_cache_v1';
 const OFFLINE_QUEUE_KEY = 'lakouwon_offline_queue_v1';
 let offlineMode = !navigator.onLine;
+let installPromptEvent = null;
 
 function isNetworkError(err){
   if(!err) return false;
@@ -459,6 +460,33 @@ function setupConnectivityListeners(){
     try{ await loadAllData(); subscribeRealtime(); }catch(e){ /* on retentera au prochain événement online */ }
     await syncOfflineQueue();
   });
+}
+
+// Le navigateur propose normalement l'installation via une icône discrète
+// dans la barre d'adresse — on intercepte l'événement pour afficher à la
+// place un bouton bien visible dans l'app (comme le bouton "Nouvelle vente").
+// Ne fonctionne que sur Chrome/Edge/Android ; Safari (iPhone/iPad) n'a pas
+// cet événement et garde son propre bouton Partager → "Sur l'écran d'accueil".
+function setupInstallPromptListener(){
+  window.addEventListener('beforeinstallprompt', (e)=>{
+    e.preventDefault();
+    installPromptEvent = e;
+    render();
+  });
+  window.addEventListener('appinstalled', ()=>{
+    installPromptEvent = null;
+    render();
+  });
+}
+function isAppInstalled(){
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true;
+}
+async function promptInstall(){
+  if(!installPromptEvent) return;
+  installPromptEvent.prompt();
+  await installPromptEvent.userChoice;
+  installPromptEvent = null;
+  render();
 }
 
 /* =========================================================
@@ -585,6 +613,12 @@ function render(){
         <path d="M2.5 3h2.4l1.9 11.6a2 2 0 0 0 2 1.7h8.4a2 2 0 0 0 1.97-1.63L20.8 7.3H6.1"></path>
       </svg>
     </button>` : ''}
+    ${installPromptEvent && !isAppInstalled() ? `<button class="fab-install" id="btn-fab-install" title="Installer l'application">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M4 19h16"></path>
+      </svg>
+      <span>Installer l'app</span>
+    </button>` : ''}
     ${editing? renderModal(ctx()) : ''}
     ${confirmState? renderConfirmDialog() : ''}
   `;
@@ -601,6 +635,8 @@ function render(){
   if(btnConfirmNo) btnConfirmNo.onclick = ()=>{ const cbNo = confirmState.onNo; confirmState=null; render(); if(cbNo) cbNo(); };
   const btnFabVente = document.getElementById('btn-fab-vente');
   if(btnFabVente) btnFabVente.onclick = ()=>{ view = 'vente'; render(); };
+  const btnFabInstall = document.getElementById('btn-fab-install');
+  if(btnFabInstall) btnFabInstall.onclick = ()=> promptInstall();
 }
 
 function renderSetup(){
@@ -874,12 +910,17 @@ function ctx(){
     isNetworkError, queueOfflineSale, loadOfflineQueue, saveOfflineQueue, persistOfflineCache, syncOfflineQueue,
     withBusyButton, exportCSV,
     get mobileSidebarOpen(){return mobileSidebarOpen;}, set mobileSidebarOpen(v){mobileSidebarOpen=v;},
+    get installPromptEvent(){return installPromptEvent;}, isAppInstalled, promptInstall,
   };
 }
 
 document.addEventListener('wheel', ()=>{
   if(document.activeElement && document.activeElement.type==='number') document.activeElement.blur();
 }, { passive:true });
+
+// Enregistré tout de suite (pas dans boot()) car l'événement peut être
+// déclenché par le navigateur avant même la fin du chargement de l'app.
+setupInstallPromptListener();
 
 /* =========================================================
    DÉMARRAGE

@@ -189,6 +189,10 @@
   .fab-vente{position:fixed; bottom:26px; right:26px; width:68px; height:68px; border-radius:50%; background:var(--ocean); color:#fff; border:3px solid #fff; font-size:30px; box-shadow:0 8px 22px rgba(19,35,64,.4); cursor:pointer; z-index:40; display:flex; align-items:center; justify-content:center;}
   .fab-vente:hover{transform:scale(1.06);}
 
+  .fab-install{position:fixed; bottom:26px; left:26px; display:flex; align-items:center; gap:9px; background:var(--navy); color:#fff; border:2px solid var(--gold); border-radius:50px; padding:12px 20px 12px 16px; font-size:14px; font-weight:700; box-shadow:0 8px 22px rgba(19,35,64,.4); cursor:pointer; z-index:40;}
+  .fab-install:hover{transform:scale(1.04);}
+  .fab-install svg{flex-shrink:0;}
+
   .mobile-topbar-toggle{display:none; position:fixed; top:12px; left:12px; z-index:56; width:42px; height:42px; border-radius:9px; background:var(--navy); color:#fff; border:none; font-size:18px; align-items:center; justify-content:center; box-shadow:var(--shadow);}
   .sidebar-close{display:none; background:none; border:none; color:#dbe3f0; font-size:18px; margin-left:auto; cursor:pointer; padding:4px;}
   .sidebar-overlay{display:none; position:fixed; inset:0; background:rgba(10,16,30,.55); z-index:55;}
@@ -212,6 +216,8 @@
     .overlay{padding:16px 10px; align-items:center;}
     .modal{padding:18px 16px; max-height:92vh; overflow-y:auto;}
     .fab-vente{bottom:18px; right:18px; width:60px; height:60px; font-size:26px; border-width:2px;}
+    .fab-install{bottom:18px; left:14px; padding:10px 16px 10px 12px; font-size:12.5px;}
+    .fab-install span{display:none;}
     .table-wrap table{font-size:12.5px;}
     th,td{padding:8px 7px;}
     .toolbar{flex-direction:column; align-items:stretch;}
