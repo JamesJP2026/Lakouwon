@@ -1189,7 +1189,7 @@ function modalReceiptPreview(ctx){
   </div></div>`;
 }
 
-function produitLiveInfoHTML(ctx, qpc,qc,qd,pa,pvd){
+function produitLiveInfoHTML(ctx, qpc,qc,qd,pa,pvd,pvg){
   qpc = qpc>0? qpc : 1;
   const total = (qc*qpc)+qd;
   const cout = pa/qpc;
@@ -1197,10 +1197,15 @@ function produitLiveInfoHTML(ctx, qpc,qc,qd,pa,pvd){
   const ok = pvd>0 && mDetail>0;
   const color = ok ? 'var(--green)' : 'var(--red)';
   const msg = ok ? '✅ Marge correcte' : (pvd>0 ? '⚠️ Marge négative ou nulle — vérifiez le prix' : '⚠️ Renseignez un prix de vente');
+  const mGros = ctx.margePct(pvg||0, cout*qpc);
+  const grosOk = (pvg||0)>0 && mGros>0;
+  const grosColor = grosOk ? 'var(--green)' : 'var(--red)';
   return `Stock total : <b class="num">${ctx.fmt(total)} unité(s)</b> <span class="muted">(${ctx.fmt(qc)} caisse(s) × ${ctx.fmt(qpc)} + ${ctx.fmt(qd)} en détail)</span><br>
     Coût unitaire : <b class="num">${ctx.money(cout)}</b> &nbsp;·&nbsp;
     Marge détail : <b class="num" style="color:${color};">${mDetail.toFixed(1)}%</b> &nbsp;·&nbsp;
-    <span style="color:${color}; font-weight:700;">${msg}</span>`;
+    <span style="color:${color}; font-weight:700;">${msg}</span>
+    ${pvg>0? `<br>Coût de la caisse (gros) : <b class="num">${ctx.money(cout*qpc)}</b> &nbsp;·&nbsp;
+    Marge gros : <b class="num" style="color:${grosColor};">${mGros.toFixed(1)}%</b> ${grosOk?'✅':'⚠️'}` : ''}`;
 }
 function lotMarginText(ctx, p, taille, prix){
   const cout = ctx.coutUnitaire(p)*taille;
@@ -1264,7 +1269,7 @@ function modalProduit(ctx){
         <input type="number" id="f-prixVenteGros" min="0" value="${lotCaisse?lotCaisse.prix:''}" placeholder="Laisser vide si non applicable">
       </div>
     </div>
-    <div class="info-box" id="live-info-box">${produitLiveInfoHTML(ctx, p.quantiteParCaisse||1, p.quantiteCaisse||0, p.quantiteDetail||0, p.prixAchat||0, p.prixVenteDetail||0)}</div>
+    <div class="info-box" id="live-info-box">${produitLiveInfoHTML(ctx, p.quantiteParCaisse||1, p.quantiteCaisse||0, p.quantiteDetail||0, p.prixAchat||0, p.prixVenteDetail||0, lotCaisse?lotCaisse.prix:0)}</div>
 
     <div class="field">
       <label>Autres tailles de lot (optionnel — ex: lot de 3, 12 unités)${aide("D'autres formats de vente groupée en plus de la vente en gros par caisse, ex: un pack de 6.")}</label>

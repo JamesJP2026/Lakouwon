@@ -643,11 +643,12 @@ export function attachAllEvents(ctx){
       const qc = parseInt(document.getElementById('f-quantiteCaisse').value)||0;
       const pa = parseFloat(document.getElementById('f-prixAchat').value)||0;
       const pvd = parseFloat(document.getElementById('f-prixVenteDetail').value)||0;
-      liveInfoBox.innerHTML = produitLiveInfoHTML(ctx, qpc, qc, qdFixe, pa, pvd);
+      const pvg = parseFloat(document.getElementById('f-prixVenteGros').value)||0;
+      liveInfoBox.innerHTML = produitLiveInfoHTML(ctx, qpc, qc, qdFixe, pa, pvd, pvg);
       const grosLabel = document.getElementById('gros-qty-label');
       if(grosLabel) grosLabel.textContent = qpc;
     };
-    ['f-quantiteParCaisse','f-quantiteCaisse','f-prixAchat','f-prixVenteDetail'].forEach(id=>{
+    ['f-quantiteParCaisse','f-quantiteCaisse','f-prixAchat','f-prixVenteDetail','f-prixVenteGros'].forEach(id=>{
       const el = document.getElementById(id); if(el) el.oninput = updateLive;
     });
   }
