@@ -2,10 +2,11 @@
 // internet (l'écran et le code de l'app sont mis en cache). Les données
 // elles-mêmes viennent de Supabase et sont gérées séparément par le cache
 // hors-ligne de l'application (voir src/js/app.js).
-const CACHE_NAME = 'lakouwon-shell-v2';
+const CACHE_NAME = 'lakouwon-shell-v3';
 const SHELL_FILES = [
   './',
   './index.html',
+  './manifest.json',
   './src/config.js',
   './src/js/app.js',
   './src/js/events.js',
@@ -37,16 +38,16 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // Supabase, polices, etc. : pas notre rôle
 
+  // Réseau en premier : l'app est mise à jour souvent, donc on veut toujours
+  // la dernière version quand internet est disponible. Le cache ne sert que
+  // de secours quand la requête réseau échoue (vraiment hors-ligne).
   event.respondWith(
-    caches.match(req).then((cached) => {
-      const networkFetch = fetch(req).then((res) => {
-        if (res && res.ok) {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
-        }
-        return res;
-      }).catch(() => cached);
-      return cached || networkFetch;
-    })
+    fetch(req).then((res) => {
+      if (res && res.ok) {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+      }
+      return res;
+    }).catch(() => caches.match(req))
   );
 });
