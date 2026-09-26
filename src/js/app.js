@@ -186,6 +186,7 @@ let achatDate = '';
 let achatFournisseur = '';
 let inventaireSearch = '';
 let inventaireComptages = {};
+let inventaireBreakdown = {};
 let productLotsDraft = [];
 let permissionsDraft = [];
 let dashboardSearchQuery = '';
@@ -361,7 +362,7 @@ function persistInventaireDraft(){
     const cle = Object.keys(inventaireComptages).length;
     if(!cle){ localStorage.removeItem(INVENTAIRE_DRAFT_KEY); return; }
     localStorage.setItem(INVENTAIRE_DRAFT_KEY, JSON.stringify({
-      magasinId: state.currentMagasinId, comptages: inventaireComptages, savedAt: Date.now(),
+      magasinId: state.currentMagasinId, comptages: inventaireComptages, breakdown: inventaireBreakdown, savedAt: Date.now(),
     }));
   }catch(e){}
 }
@@ -372,6 +373,7 @@ function restoreInventaireDraft(){
     const d = JSON.parse(raw);
     if(!d || d.magasinId !== state.currentMagasinId || !d.comptages) return;
     inventaireComptages = d.comptages;
+    inventaireBreakdown = d.breakdown || {};
   }catch(e){}
 }
 
@@ -882,6 +884,7 @@ function ctx(){
     get inventaireSearch(){return inventaireSearch;}, set inventaireSearch(v){inventaireSearch=v;},
     get inventaireComptages(){return inventaireComptages;}, set inventaireComptages(v){inventaireComptages=v;},
     persistInventaireDraft,
+    get inventaireBreakdown(){return inventaireBreakdown;}, set inventaireBreakdown(v){inventaireBreakdown=v;},
     get productLotsDraft(){return productLotsDraft;}, set productLotsDraft(v){productLotsDraft=v;},
     get permissionsDraft(){return permissionsDraft;}, set permissionsDraft(v){permissionsDraft=v;},
     get dashboardSearchQuery(){return dashboardSearchQuery;}, set dashboardSearchQuery(v){dashboardSearchQuery=v;},

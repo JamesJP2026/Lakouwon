@@ -262,10 +262,48 @@ export function attachAllEvents(ctx){
       ecartCell.style.fontWeight = ecart? '700':'';
     }
   });
+  // Comptage par caisse + lot pour les produits vendus par caisse : les 3
+  // sous-champs se combinent en un seul total en unités, comme le ferait
+  // un champ unique, pour ne rien changer au reste du système (écart,
+  // application au stock, export).
+  const updateInventaireBreakdown = (id)=>{
+    const p = state.produits.find(x=>x.id===id);
+    if(!p) return;
+    const qpc = p.quantiteParCaisse||1;
+    const autreLot = (p.lots||[]).filter(l=>l.taille && l.taille!==qpc).sort((a,b)=>a.taille-b.taille)[0];
+    const bd = ctx.inventaireBreakdown[id] || (ctx.inventaireBreakdown[id] = {});
+    const cInp = document.querySelector(`[data-inv-caisses="${id}"]`);
+    const lInp = document.querySelector(`[data-inv-lots="${id}"]`);
+    const uInp = document.querySelector(`[data-inv-unites="${id}"]`);
+    bd.caisses = cInp ? cInp.value : '';
+    bd.lots = lInp ? lInp.value : '';
+    bd.unites = uInp ? uInp.value : '';
+    const vide = (v)=> v===''||v===undefined||v===null;
+    const toucheQqchose = !vide(bd.caisses) || !vide(bd.lots) || !vide(bd.unites);
+    const compte = toucheQqchose
+      ? (parseInt(bd.caisses)||0)*qpc + (autreLot ? (parseInt(bd.lots)||0)*autreLot.taille : 0) + (parseInt(bd.unites)||0)
+      : null;
+    ctx.inventaireComptages[id] = compte===null ? '' : compte;
+    ctx.persistInventaireDraft();
+    const systeme = ctx.stockUnites(p);
+    const ecart = compte===null ? null : compte - systeme;
+    const ecartCell = document.querySelector(`[data-inv-ecart="${id}"]`);
+    if(ecartCell){
+      ecartCell.textContent = ecart===null?'—':(ecart>0?'+':'')+ctx.fmt(ecart);
+      ecartCell.style.color = ecart>0?'var(--green)':ecart<0?'var(--red)':'';
+      ecartCell.style.fontWeight = ecart? '700':'';
+    }
+    const totalLabel = document.querySelector(`[data-inv-total="${id}"]`);
+    if(totalLabel) totalLabel.textContent = compte===null?'':`= ${ctx.fmt(compte)} unité(s)`;
+  };
+  document.querySelectorAll('[data-inv-caisses]').forEach(inp=>inp.oninput = ()=> updateInventaireBreakdown(inp.dataset.invCaisses));
+  document.querySelectorAll('[data-inv-lots]').forEach(inp=>inp.oninput = ()=> updateInventaireBreakdown(inp.dataset.invLots));
+  document.querySelectorAll('[data-inv-unites]').forEach(inp=>inp.oninput = ()=> updateInventaireBreakdown(inp.dataset.invUnites));
   const btnResetInventaire = document.getElementById('btn-reset-inventaire');
   if(btnResetInventaire) btnResetInventaire.onclick = ()=>{
     ctx.askConfirm('Effacer tout le comptage en cours ?', ()=>{
       ctx.inventaireComptages = {};
+      ctx.inventaireBreakdown = {};
       ctx.persistInventaireDraft();
       ctx.render();
     });
