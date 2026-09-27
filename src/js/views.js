@@ -420,28 +420,20 @@ function inventaireRowHTML(ctx, p){
   const systeme = ctx.stockUnites(p);
   const qpc = p.quantiteParCaisse||1;
   const parCaisse = qpc > 1;
-  // Pour un produit vendu par caisse, on compte par caisses entières + un
-  // éventuel lot (le plus petit format configuré, ex: pack de 6) pour ce qui
-  // reste après les caisses, plutôt que de forcer à compter chaque unité une
-  // par une.
-  const autreLot = parCaisse ? (p.lots||[]).filter(l=>l.taille && l.taille!==qpc).sort((a,b)=>a.taille-b.taille)[0] : null;
 
   let compte, invInputsHTML;
   if(parCaisse){
     const bd = ctx.inventaireBreakdown[p.id] || {};
     const vide = (v)=> v===''||v===undefined||v===null;
-    const toucheQqchose = !vide(bd.caisses) || !vide(bd.lots) || !vide(bd.unites);
+    const toucheQqchose = !vide(bd.caisses) || !vide(bd.unites);
     compte = toucheQqchose
-      ? (parseInt(bd.caisses)||0)*qpc + (autreLot ? (parseInt(bd.lots)||0)*autreLot.taille : 0) + (parseInt(bd.unites)||0)
+      ? (parseInt(bd.caisses)||0)*qpc + (parseInt(bd.unites)||0)
       : null;
     invInputsHTML = `
       <div style="display:flex; flex-direction:column; gap:3px; align-items:flex-end;">
         <div style="display:flex; gap:4px; align-items:center; font-size:11px;">
           <input type="number" min="0" style="width:55px; text-align:right;" data-inv-caisses="${p.id}" value="${bd.caisses??''}" placeholder="0"> <span class="muted">caisse(s)</span>
         </div>
-        ${autreLot? `<div style="display:flex; gap:4px; align-items:center; font-size:11px;">
-          <input type="number" min="0" style="width:55px; text-align:right;" data-inv-lots="${p.id}" value="${bd.lots??''}" placeholder="0"> <span class="muted">lot(s) de ${fmt(autreLot.taille)}u</span>
-        </div>` : ''}
         <div style="display:flex; gap:4px; align-items:center; font-size:11px;">
           <input type="number" min="0" style="width:55px; text-align:right;" data-inv-unites="${p.id}" value="${bd.unites??''}" placeholder="0"> <span class="muted">unité(s) seule(s)</span>
         </div>
@@ -475,7 +467,7 @@ export function renderInventaire(ctx){
       ${ctx.isAdminConnecte()? `<button class="btn btn-primary" id="btn-appliquer-inventaire">✔ Appliquer au stock</button>` : ''}
     </div>
   </div>
-  <div class="info-box">Pour les produits vendus par caisse, comptez le nombre de caisses entières, puis le reste par lot (si configuré) et par unité seule — le total en unités est calculé automatiquement. Pour les autres produits, entrez directement le nombre d'unités. L'écart s'affiche automatiquement. ${nbComptes>0?`<b>${nbComptes} produit(s) compté(s)</b> — sauvegardé automatiquement si la page se ferme.`:''}</div>
+  <div class="info-box">Pour les produits vendus par caisse, comptez le nombre de caisses entières, puis le reste par unité seule — le total en unités est calculé automatiquement. Pour les autres produits, entrez directement le nombre d'unités. L'écart s'affiche automatiquement. ${nbComptes>0?`<b>${nbComptes} produit(s) compté(s)</b> — sauvegardé automatiquement si la page se ferme.`:''}</div>
   <div class="toolbar">
     <input class="search" id="inventaire-search" placeholder="🔎 Rechercher un produit ou une catégorie..." value="${ctx.inventaireSearch}">
     <button class="btn btn-sm" id="btn-reset-inventaire">✕ Réinitialiser le comptage</button>

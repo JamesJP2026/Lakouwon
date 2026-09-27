@@ -262,7 +262,7 @@ export function attachAllEvents(ctx){
       ecartCell.style.fontWeight = ecart? '700':'';
     }
   });
-  // Comptage par caisse + lot pour les produits vendus par caisse : les 3
+  // Comptage par caisse pour les produits vendus par caisse : les 2
   // sous-champs se combinent en un seul total en unités, comme le ferait
   // un champ unique, pour ne rien changer au reste du système (écart,
   // application au stock, export).
@@ -270,18 +270,15 @@ export function attachAllEvents(ctx){
     const p = state.produits.find(x=>x.id===id);
     if(!p) return;
     const qpc = p.quantiteParCaisse||1;
-    const autreLot = (p.lots||[]).filter(l=>l.taille && l.taille!==qpc).sort((a,b)=>a.taille-b.taille)[0];
     const bd = ctx.inventaireBreakdown[id] || (ctx.inventaireBreakdown[id] = {});
     const cInp = document.querySelector(`[data-inv-caisses="${id}"]`);
-    const lInp = document.querySelector(`[data-inv-lots="${id}"]`);
     const uInp = document.querySelector(`[data-inv-unites="${id}"]`);
     bd.caisses = cInp ? cInp.value : '';
-    bd.lots = lInp ? lInp.value : '';
     bd.unites = uInp ? uInp.value : '';
     const vide = (v)=> v===''||v===undefined||v===null;
-    const toucheQqchose = !vide(bd.caisses) || !vide(bd.lots) || !vide(bd.unites);
+    const toucheQqchose = !vide(bd.caisses) || !vide(bd.unites);
     const compte = toucheQqchose
-      ? (parseInt(bd.caisses)||0)*qpc + (autreLot ? (parseInt(bd.lots)||0)*autreLot.taille : 0) + (parseInt(bd.unites)||0)
+      ? (parseInt(bd.caisses)||0)*qpc + (parseInt(bd.unites)||0)
       : null;
     ctx.inventaireComptages[id] = compte===null ? '' : compte;
     ctx.persistInventaireDraft();
@@ -297,7 +294,6 @@ export function attachAllEvents(ctx){
     if(totalLabel) totalLabel.textContent = compte===null?'':`= ${ctx.fmt(compte)} unité(s)`;
   };
   document.querySelectorAll('[data-inv-caisses]').forEach(inp=>inp.oninput = ()=> updateInventaireBreakdown(inp.dataset.invCaisses));
-  document.querySelectorAll('[data-inv-lots]').forEach(inp=>inp.oninput = ()=> updateInventaireBreakdown(inp.dataset.invLots));
   document.querySelectorAll('[data-inv-unites]').forEach(inp=>inp.oninput = ()=> updateInventaireBreakdown(inp.dataset.invUnites));
   const btnResetInventaire = document.getElementById('btn-reset-inventaire');
   if(btnResetInventaire) btnResetInventaire.onclick = ()=>{
