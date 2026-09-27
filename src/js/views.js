@@ -193,8 +193,8 @@ export function generateReceiptHTML(ctx, vente){
   return `
     <div style="font-family:'Inter',Arial,sans-serif; max-width:320px; margin:0 auto;">
       <div style="text-align:center; margin-bottom:10px;">
-        ${logo? `<img src="${logo}" style="max-width:70px; max-height:70px; margin-bottom:6px;">` : ''}
-        <div style="font-weight:800; font-size:16px;">${magasin? magasin.nom : s.nomCommerce}</div>
+        ${logo? `<img src="${logo}" style="max-width:70px; max-height:70px; margin-bottom:0px; display:block; margin-left:auto; margin-right:auto;">` : ''}
+        <div style="font-weight:800; font-size:16px; margin-top:2px;">${magasin? magasin.nom : s.nomCommerce}</div>
         ${adresse? `<div style="font-size:11px;">${adresse}</div>`:''}
         ${telephone? `<div style="font-size:11px;">Tél: ${telephone}</div>`:''}
         ${email? `<div style="font-size:11px;">${email}</div>`:''}
