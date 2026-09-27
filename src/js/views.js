@@ -74,7 +74,6 @@ export function renderDashboard(ctx){
   const stockBas = ctx.magasinProduits().filter(p=>ctx.stockUnites(p) <= (p.stockMinimum||0));
   const journalMag = state.journal.filter(j=>j.magasinId===state.currentMagasinId).slice(0,12);
   const dettes = ctx.totalDettesMagasin();
-  const totalVentesTout = ctx.magasinVentes().reduce((s,v)=>s+v.total,0);
   return `
   <div class="topbar">
     <div><h1>Tableau de bord</h1><p>Vue d'ensemble en temps réel de votre business</p></div>
@@ -89,8 +88,7 @@ export function renderDashboard(ctx){
   </div>
   <div class="kpi-row">
     <div class="kpi pos"><div class="lbl">Bénéfice net</div><div class="val num">${money(k.beneficeNet)}</div><div class="sub">Marge − dépenses de la période</div></div>
-    <div class="kpi"><div class="lbl">Chiffre d'affaires</div><div class="val num">${money(k.ca)}</div><div class="sub">${ctx.ventesPeriode().length} vente(s) — période sélectionnée</div></div>
-    <div class="kpi white"><div class="lbl">Montant total des ventes</div><div class="val num">${money(totalVentesTout)}</div><div class="sub">${ctx.magasinVentes().length} vente(s) — depuis le début</div></div>
+    <div class="kpi"><div class="lbl">Chiffre d'affaires</div><div class="val num">${money(k.ca)}</div><div class="sub">${ctx.ventesPeriode().length} vente(s)</div></div>
     <div class="kpi gold"><div class="lbl">Marge brute</div><div class="val num">${money(k.margeBrute)}</div><div class="sub">${k.margePct.toFixed(1)}% de marge</div></div>
     <div class="kpi neg"><div class="lbl">Dépenses</div><div class="val num">${money(k.depenses)}</div><div class="sub">Sorties de caisse hors ventes</div></div>
     <div class="kpi white"><div class="lbl">Dettes clients</div><div class="val num">${money(dettes)}</div><div class="sub">Crédits non soldés</div></div>
