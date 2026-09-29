@@ -223,11 +223,12 @@ export function generateReceiptHTML(ctx, vente){
 // Le mode de paiement enregistré sur la vente ("credit") reflète
 // comment elle a démarré, pas son état actuel : une fois la dette
 // entièrement remboursée (reste <= 0), on l'affiche comme payée.
-function venteModeBadgeHTML(v){
+function venteModeBadgeHTML(v, big){
+  const style = big ? ' style="font-size:13px; padding:5px 13px;"' : '';
   if(v.modePaiement==='credit' && v.reste<=0){
-    return `<span class="badge cash" title="Crédit entièrement remboursé">Payé</span>`;
+    return `<span class="badge cash"${style} title="Crédit entièrement remboursé">Payé</span>`;
   }
-  return `<span class="badge ${v.modePaiement}">${v.modePaiement}</span>`;
+  return `<span class="badge ${v.modePaiement}"${style}>${v.modePaiement}</span>`;
 }
 export function fichesFiltrees(ctx){
   let ventes = ctx.magasinVentes().slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
@@ -252,14 +253,14 @@ export function fichesTableHTML(ctx){
   const ventes = fichesFiltrees(ctx);
   return `
     <table>
-      <thead><tr><th>N° Fiche</th><th>Date</th><th>Client</th><th>Mode</th><th class="right">Total</th><th class="right">Payé</th><th class="right">Reste</th><th></th></tr></thead>
+      <thead><tr><th>N° Fiche</th><th>Date</th><th>Client</th><th class="right">Mode</th><th class="right">Total</th><th class="right">Payé</th><th class="right">Reste</th><th></th></tr></thead>
       <tbody>
         ${ventes.length? ventes.map(v=>`
           <tr>
             <td><b>${v.numero}</b>${v.pendingSync? ' <span class="tag low" title="Faite hors-ligne, en attente d\'envoi au serveur">⏳ hors-ligne</span>' : ''}</td>
             <td class="muted">${new Date(v.date).toLocaleString('fr-FR')}</td>
             <td>${v.clientId? ctx.clientName(v.clientId) : '<span class="muted">Comptant</span>'}</td>
-            <td>${venteModeBadgeHTML(v)}</td>
+            <td class="right">${venteModeBadgeHTML(v, true)}</td>
             <td class="right num">${money(v.total)}</td>
             <td class="right num">${money(v.montantPaye)}</td>
             <td class="right num" style="${v.reste>0?'color:var(--red);font-weight:700;':''}">${money(v.reste)}</td>
