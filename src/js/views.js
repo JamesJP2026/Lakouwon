@@ -970,6 +970,11 @@ export function renderParametres(ctx){
     <button class="btn btn-primary" id="btn-retry-offline-sync" style="margin-top:10px;">🔄 Réessayer maintenant</button>
   </div>` : ''}
 
+  ${ctx.isAdminConnecte()? `<div class="panel" style="max-width:560px;">
+    <h3>Sécurité</h3>
+    <button class="btn btn-primary" id="btn-change-password">🔑 Changer mon mot de passe</button>
+  </div>` : ''}
+
   <div class="panel" style="max-width:560px;">
     <h3>Apparence</h3>
     <div class="row2">

@@ -769,7 +769,6 @@ function renderSidebar(){
     ${connectivityBannerHTML()}
     <div class="sidebar-foot">
       Connecté : <b>${u?u.nom:''}</b><br>${u?u.role:''}
-      ${u && u.role==='Admin' ? `<button class="btn btn-sm" id="btn-change-password" style="width:100%; justify-content:center; margin-top:10px;">🔑 Changer mon mot de passe</button>` : ''}
       <button class="btn btn-sm" id="btn-logout" style="width:100%; justify-content:center; margin-top:6px;">🔒 Se déconnecter</button>
     </div>
   </div>`;
