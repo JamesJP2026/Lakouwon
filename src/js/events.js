@@ -213,6 +213,12 @@ export function attachAllEvents(ctx){
     document.querySelectorAll('#product-grid .product-card').forEach(c=>{ c.style.display = c.dataset.rupture==='1' ? '' : 'none'; });
     document.getElementById('product-grid')?.scrollIntoView({ behavior:'smooth', block:'start' });
   };
+  const btnBasFilter = document.getElementById('btn-bas-filter');
+  if(btnBasFilter) btnBasFilter.onclick = ()=>{
+    if(produitsSearch) produitsSearch.value = '';
+    document.querySelectorAll('#product-grid .product-card').forEach(c=>{ c.style.display = c.dataset.bas==='1' ? '' : 'none'; });
+    document.getElementById('product-grid')?.scrollIntoView({ behavior:'smooth', block:'start' });
+  };
   const btnExportStockCsv = document.getElementById('btn-export-stock-csv');
   if(btnExportStockCsv) btnExportStockCsv.onclick = ()=>{
     ctx.exportCSV('stock.csv',
