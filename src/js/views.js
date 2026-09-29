@@ -436,7 +436,7 @@ function inventaireRowHTML(ctx, p){
           <input type="number" min="0" style="width:55px; text-align:right;" data-inv-caisses="${p.id}" value="${bd.caisses??''}" placeholder="0"> <span class="muted">caisse(s)</span>
         </div>
         <div style="display:flex; gap:4px; align-items:center; font-size:11px;">
-          <input type="number" min="0" style="width:55px; text-align:right;" data-inv-unites="${p.id}" value="${bd.unites??''}" placeholder="0"> <span class="muted">unité(s) seule(s)</span>
+          <input type="number" min="0" style="width:55px; text-align:right;" data-inv-unites="${p.id}" value="${bd.unites??''}" placeholder="0"> <span class="muted">unité(s)</span>
         </div>
         <div class="muted" style="font-size:10.5px;" data-inv-total="${p.id}">${compte===null?'':`= ${fmt(compte)} unité(s)`}</div>
       </div>`;
