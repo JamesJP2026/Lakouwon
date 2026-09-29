@@ -249,17 +249,18 @@ export function fichesFiltrees(ctx){
   return ventes;
 }
 export function fichesTableHTML(ctx){
-  const { money } = ctx;
+  const { money, fmt } = ctx;
   const ventes = fichesFiltrees(ctx);
   return `
     <table>
-      <thead><tr><th>N° Fiche</th><th>Date</th><th>Client</th><th class="right">Mode</th><th class="right">Total</th><th class="right">Payé</th><th class="right">Reste</th><th></th></tr></thead>
+      <thead><tr><th>N° Fiche</th><th>Date</th><th>Client</th><th class="right">Qté produits</th><th class="right">Mode</th><th class="right">Total</th><th class="right">Payé</th><th class="right">Reste</th><th></th></tr></thead>
       <tbody>
         ${ventes.length? ventes.map(v=>`
           <tr>
             <td><b>${v.numero}</b>${v.pendingSync? ' <span class="tag low" title="Faite hors-ligne, en attente d\'envoi au serveur">⏳ hors-ligne</span>' : ''}</td>
             <td class="muted">${new Date(v.date).toLocaleString('fr-FR')}</td>
             <td>${v.clientId? ctx.clientName(v.clientId) : '<span class="muted">Comptant</span>'}</td>
+            <td class="right num">${fmt((v.items||[]).reduce((s,i)=>s+(i.qte||0),0))}</td>
             <td class="right">${venteModeBadgeHTML(v, true)}</td>
             <td class="right num">${money(v.total)}</td>
             <td class="right num">${money(v.montantPaye)}</td>
@@ -268,7 +269,7 @@ export function fichesTableHTML(ctx){
               <button class="btn btn-sm" data-voir-vente="${v.id}">Voir</button>
               ${ctx.isAdminConnecte() && !v.pendingSync? `<button class="btn btn-sm btn-gold" data-modifier-vente="${v.id}">Modifier</button><button class="btn btn-sm btn-danger" data-suppr-vente="${v.id}">Suppr.</button>` : ''}
             </td>
-          </tr>`).join('') : `<tr><td colspan="8" class="empty">Aucune vente enregistrée.</td></tr>`}
+          </tr>`).join('') : `<tr><td colspan="9" class="empty">Aucune vente enregistrée.</td></tr>`}
       </tbody>
     </table>`;
 }
