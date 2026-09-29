@@ -595,6 +595,56 @@ function renderConfirmDialog(){
   </div></div>`;
 }
 
+// Rend un bouton flottant déplaçable à la souris/au doigt, avec la position
+// mémorisée par appareil (localStorage) pour ne pas cacher des infos utiles.
+// Un vrai déplacement (au-delà de quelques pixels) empêche le clic qui suit.
+function makeDraggable(el, storageKey){
+  if(!el) return;
+  try{
+    const saved = JSON.parse(localStorage.getItem(storageKey)||'null');
+    if(saved){ el.style.top=saved.top+'px'; el.style.left=saved.left+'px'; el.style.right='auto'; el.style.bottom='auto'; }
+  }catch(err){}
+  let dragging=false, moved=false, startX=0, startY=0, startLeft=0, startTop=0;
+  const onMove = (e)=>{
+    if(!dragging) return;
+    const pt = e.touches ? e.touches[0] : e;
+    const dx = pt.clientX-startX, dy = pt.clientY-startY;
+    if(Math.abs(dx)>5 || Math.abs(dy)>5) moved = true;
+    if(!moved) return;
+    e.preventDefault();
+    const maxLeft = window.innerWidth - el.offsetWidth - 4;
+    const maxTop = window.innerHeight - el.offsetHeight - 4;
+    el.style.left = Math.min(Math.max(4,startLeft+dx), Math.max(4,maxLeft))+'px';
+    el.style.top = Math.min(Math.max(4,startTop+dy), Math.max(4,maxTop))+'px';
+    el.style.right = 'auto'; el.style.bottom = 'auto';
+  };
+  const onUp = ()=>{
+    dragging = false;
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.removeEventListener('touchend', onUp);
+    if(moved){
+      try{ localStorage.setItem(storageKey, JSON.stringify({top:parseFloat(el.style.top), left:parseFloat(el.style.left)})); }catch(err){}
+      el.dataset.justDragged = '1';
+      setTimeout(()=>{ delete el.dataset.justDragged; }, 50);
+    }
+  };
+  const onDown = (e)=>{
+    dragging = true; moved = false;
+    const rect = el.getBoundingClientRect();
+    startLeft = rect.left; startTop = rect.top;
+    const pt = e.touches ? e.touches[0] : e;
+    startX = pt.clientX; startY = pt.clientY;
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('touchmove', onMove, {passive:false});
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchend', onUp);
+  };
+  el.addEventListener('mousedown', onDown);
+  el.addEventListener('touchstart', onDown, {passive:true});
+}
+
 function render(){
   const app = document.getElementById('app');
   if(bootstrapNeeded){ app.innerHTML = renderSetup(); attachSetupEvents(); return; }
@@ -636,9 +686,15 @@ function render(){
   const btnConfirmNo = document.getElementById('btn-confirm-no');
   if(btnConfirmNo) btnConfirmNo.onclick = ()=>{ const cbNo = confirmState.onNo; confirmState=null; render(); if(cbNo) cbNo(); };
   const btnFabVente = document.getElementById('btn-fab-vente');
-  if(btnFabVente) btnFabVente.onclick = ()=>{ view = 'vente'; render(); };
+  if(btnFabVente){
+    makeDraggable(btnFabVente, 'lakouwon-fab-vente-pos');
+    btnFabVente.onclick = ()=>{ if(btnFabVente.dataset.justDragged) return; view = 'vente'; render(); };
+  }
   const btnFabInstall = document.getElementById('btn-fab-install');
-  if(btnFabInstall) btnFabInstall.onclick = ()=> promptInstall();
+  if(btnFabInstall){
+    makeDraggable(btnFabInstall, 'lakouwon-fab-install-pos');
+    btnFabInstall.onclick = ()=>{ if(btnFabInstall.dataset.justDragged) return; promptInstall(); };
+  }
 }
 
 function renderSetup(){
