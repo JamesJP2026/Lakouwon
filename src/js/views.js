@@ -317,6 +317,7 @@ export function renderProduits(ctx){
   const parCategorie = {};
   produits.forEach(p=>{ const c = p.categorie || 'Sans catégorie'; parCategorie[c] = (parCategorie[c]||0)+1; });
   const categoriesTriees = Object.entries(parCategorie).sort((a,b)=>b[1]-a[1]);
+  const nbRupture = produits.filter(p=>ctx.stockUnites(p)<=0).length;
   return `
   <div class="topbar">
     <div><h1>Produits & Stock</h1><p>Gérez votre inventaire, vos prix détail et gros</p></div>
@@ -334,6 +335,7 @@ export function renderProduits(ctx){
   <div class="muted" style="font-size:12px; margin-bottom:14px;">Un produit sans vente depuis ${ctx.SEUIL_ARCHIVAGE_JOURS} jours est archivé automatiquement et retiré du point de vente. Vous pouvez le réactiver à tout moment.</div>
   <div class="panel" style="padding:12px 16px; margin-bottom:16px; display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px;">
     <button type="button" class="btn btn-sm" id="btn-cat-filter-tous" style="font-weight:700;"><b style="font-size:18px;">${fmt(produits.length)}</b> produit${produits.length>1?'s':''} enregistré${produits.length>1?'s':''}</button>
+    ${nbRupture>0? `<button type="button" class="badge" id="btn-rupture-filter" title="Voir uniquement les produits en rupture de stock" style="border:none; cursor:pointer; font:inherit; background:var(--red-bg); color:var(--red); font-weight:700;">⚠ ${fmt(nbRupture)} en rupture de stock</button>` : ''}
     ${categoriesTriees.length? `<div style="display:flex; flex-wrap:wrap; gap:6px 10px; border-left:1px solid var(--line); padding-left:14px;">
       ${categoriesTriees.map(([cat,n])=>`<button type="button" class="badge cash" data-cat-filter="${cat==='Sans catégorie'?'__none__':cat}" title="Voir les produits de ${cat}" style="border:none; cursor:pointer; font:inherit;">${cat} : ${fmt(n)}</button>`).join('')}
     </div>` : ''}
@@ -345,7 +347,7 @@ export function renderProduits(ctx){
       const bas = total <= (p.stockMinimum||0);
       const lots = p.lots||[];
       const lotCaisse = lots.find(l=>l.taille===(p.quantiteParCaisse||1));
-      return `<div class="product-card" data-name="${(p.nom+' '+(p.categorie||'')).toLowerCase()}" data-cat="${p.categorie||'__none__'}" style="${p.archive?'opacity:.6;':''}">
+      return `<div class="product-card" data-name="${(p.nom+' '+(p.categorie||'')).toLowerCase()}" data-cat="${p.categorie||'__none__'}" data-rupture="${total<=0?'1':'0'}" style="${p.archive?'opacity:.6;':''}">
         <div class="pc-head">
           <div class="pc-name">${p.nom} ${p.archive?'<span class="badge role-Caissier">Archivé</span>':''}</div>
           <span class="badge ${bas?'credit':'cash'}">${fmt(total)} u.</span>
