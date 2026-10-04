@@ -1014,7 +1014,11 @@ async function finalizeSale(ctx, montantRecuConfirme){
   if(ctx.cart.length===0 || ctx.busy) return;
   ctx.busy = true; ctx.render();
   const cartSnapshot = ctx.cart.map(i=>({...i}));
-  const items = cartSnapshot.map(i=>({ produit_id: i.produitId, mode: i.mode, lot_id: i.lotId||null, qte: i.qte, prix_vente: i.prixVente }));
+  // unite_par_lot permet au serveur de retrouver le bon lot même quand
+  // lot_id est absent — cas d'une fiche existante rechargée pour
+  // modification, dont les articles n'ont jamais stocké cet id (voir
+  // le correctif serveur sur rpc_modifier_vente/rpc_finalize_sale).
+  const items = cartSnapshot.map(i=>({ produit_id: i.produitId, mode: i.mode, lot_id: i.lotId||null, unite_par_lot: i.uniteParLot||null, qte: i.qte, prix_vente: i.prixVente }));
   const params = {
     p_items: items, p_remise_type: ctx.posRemiseType, p_remise_valeur: ctx.posRemiseValeur,
     p_mode_paiement: ctx.posDepositMode, p_montant_recu: Math.max(0, montantRecuConfirme||0),

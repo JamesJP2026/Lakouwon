@@ -108,12 +108,25 @@ begin
     v_prix_vente := (v_item->>'prix_vente')::numeric;
     if v_prix_vente is null or v_prix_vente < 0 then raise exception 'Prix de vente invalide pour %', v_produit.nom; end if;
     if (v_item->>'mode') = 'gros' then
-      select l into v_lot from jsonb_array_elements(v_produit.lots) l where l->>'id' = (v_item->>'lot_id') limit 1;
+      -- On cherche d'abord par lot_id (ajout frais au panier). Si absent ou
+      -- obsolète (ex: fiche existante rechargée pour modification, dont les
+      -- articles n'ont jamais stocké cet id), on retombe sur la taille du
+      -- lot historique (uniteParLot) : un produit a rarement deux lots de
+      -- la même taille, donc ça retrouve le bon lot sans faire échouer la
+      -- modification d'une fiche ancienne.
+      v_lot := null;
+      if (v_item->>'lot_id') is not null then
+        select l into v_lot from jsonb_array_elements(v_produit.lots) l where l->>'id' = (v_item->>'lot_id') limit 1;
+      end if;
+      if v_lot is null and (v_item->>'unite_par_lot') is not null then
+        select l into v_lot from jsonb_array_elements(v_produit.lots) l where (l->>'taille')::int = (v_item->>'unite_par_lot')::int limit 1;
+      end if;
       if v_lot is null then raise exception 'Lot introuvable pour %', v_produit.nom; end if;
       v_unite_par_lot := (v_lot->>'taille')::int;
       v_cout_unitaire := (v_produit.prix_achat / greatest(v_produit.quantite_par_caisse,1)) * v_unite_par_lot;
       v_nom := v_produit.nom || ' — Lot de ' || v_unite_par_lot;
     else
+      v_lot := null;
       v_unite_par_lot := 1;
       v_cout_unitaire := v_produit.prix_achat / greatest(v_produit.quantite_par_caisse,1);
       v_nom := v_produit.nom;
@@ -138,7 +151,7 @@ begin
     v_cout_total := v_cout_total + (v_qte * v_cout_unitaire);
     v_items_out := v_items_out || jsonb_build_array(jsonb_build_object(
       'produitId', v_produit_id, 'nom', v_nom, 'mode', coalesce(v_item->>'mode','detail'),
-      'qte', v_qte, 'uniteParLot', v_unite_par_lot, 'prixVente', v_prix_vente, 'coutUnitaire', v_cout_unitaire));
+      'qte', v_qte, 'uniteParLot', v_unite_par_lot, 'lotId', (v_lot->>'id'), 'prixVente', v_prix_vente, 'coutUnitaire', v_cout_unitaire));
   end loop;
 
   v_remise := round(case when p_remise_valeur is null or p_remise_valeur <= 0 then 0
@@ -265,12 +278,25 @@ begin
     v_prix_vente := (v_item->>'prix_vente')::numeric;
     if v_prix_vente is null or v_prix_vente < 0 then raise exception 'Prix de vente invalide pour %', v_produit.nom; end if;
     if (v_item->>'mode') = 'gros' then
-      select l into v_lot from jsonb_array_elements(v_produit.lots) l where l->>'id' = (v_item->>'lot_id') limit 1;
+      -- On cherche d'abord par lot_id (ajout frais au panier). Si absent ou
+      -- obsolète (ex: fiche existante rechargée pour modification, dont les
+      -- articles n'ont jamais stocké cet id), on retombe sur la taille du
+      -- lot historique (uniteParLot) : un produit a rarement deux lots de
+      -- la même taille, donc ça retrouve le bon lot sans faire échouer la
+      -- modification d'une fiche ancienne.
+      v_lot := null;
+      if (v_item->>'lot_id') is not null then
+        select l into v_lot from jsonb_array_elements(v_produit.lots) l where l->>'id' = (v_item->>'lot_id') limit 1;
+      end if;
+      if v_lot is null and (v_item->>'unite_par_lot') is not null then
+        select l into v_lot from jsonb_array_elements(v_produit.lots) l where (l->>'taille')::int = (v_item->>'unite_par_lot')::int limit 1;
+      end if;
       if v_lot is null then raise exception 'Lot introuvable pour %', v_produit.nom; end if;
       v_unite_par_lot := (v_lot->>'taille')::int;
       v_cout_unitaire := (v_produit.prix_achat / greatest(v_produit.quantite_par_caisse,1)) * v_unite_par_lot;
       v_nom := v_produit.nom || ' — Lot de ' || v_unite_par_lot;
     else
+      v_lot := null;
       v_unite_par_lot := 1;
       v_cout_unitaire := v_produit.prix_achat / greatest(v_produit.quantite_par_caisse,1);
       v_nom := v_produit.nom;
@@ -295,7 +321,7 @@ begin
     v_cout_total := v_cout_total + (v_qte * v_cout_unitaire);
     v_items_out := v_items_out || jsonb_build_array(jsonb_build_object(
       'produitId', v_produit_id, 'nom', v_nom, 'mode', coalesce(v_item->>'mode','detail'),
-      'qte', v_qte, 'uniteParLot', v_unite_par_lot, 'prixVente', v_prix_vente, 'coutUnitaire', v_cout_unitaire));
+      'qte', v_qte, 'uniteParLot', v_unite_par_lot, 'lotId', (v_lot->>'id'), 'prixVente', v_prix_vente, 'coutUnitaire', v_cout_unitaire));
   end loop;
 
   v_remise := round(case when p_remise_valeur is null or p_remise_valeur <= 0 then 0
