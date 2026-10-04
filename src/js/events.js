@@ -763,12 +763,17 @@ export function attachAllEvents(ctx){
       const { data: newCat, error: catErr } = await supabase.from('categories').insert({nom:data.categorie}).select().single();
       if(!catErr) ctx.upsertRow('categories', newCat);
     }
+    const produitActuelAvant = ctx.editing.id ? state.produits.find(x=>x.id===ctx.editing.id) : null;
+    // Garder le même id pour le lot "caisse" d'une sauvegarde à l'autre, sinon
+    // une fiche déjà créée en mode gros pointe vers un id de lot qui n'existe
+    // plus après modification du produit ("Lot introuvable").
+    const ancienLotCaisse = produitActuelAvant ? (produitActuelAvant.lots||[]).find(l=>l.taille===produitActuelAvant.quantiteParCaisse) : null;
     const prixVenteGros = parseFloat(document.getElementById('f-prixVenteGros').value)||0;
     if(prixVenteGros > 0){
-      data.lots.push({id:ctx.uid(), taille:data.quantite_par_caisse, prix:prixVenteGros});
+      data.lots.push({id: ancienLotCaisse?.id || ctx.uid(), taille:data.quantite_par_caisse, prix:prixVenteGros});
     }
     if(ctx.editing.id){
-      const produitActuel = state.produits.find(x=>x.id===ctx.editing.id);
+      const produitActuel = produitActuelAvant;
       if(detailDepuisFraction>0) data.quantite_detail = (produitActuel.quantiteDetail||0) + detailDepuisFraction;
       const { error } = await supabase.from('produits').update(data).eq('id', ctx.editing.id);
       if(error){ ctx.showToast(ctx.friendlyError(error)); return; }
