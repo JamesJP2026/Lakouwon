@@ -96,7 +96,9 @@ Deno.serve(async (req) => {
     global: { headers: { Authorization: authHeader } },
   });
   const { data: userData, error: userErr2 } = await callerClient.auth.getUser();
-  if (userErr2 || !userData?.user) return json({ error: "Non authentifié" }, 401);
+  if (userErr2 || !userData?.user) {
+    return json({ error: "Non authentifié" + (userErr2 ? " (" + userErr2.message + ")" : authHeader ? "" : " (en-tête Authorization manquant)") }, 401);
+  }
 
   const { data: callerEmploye, error: callerErr } = await admin
     .from("employes")

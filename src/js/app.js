@@ -460,6 +460,44 @@ async function syncOfflineQueue(){
   render();
 }
 
+const OFFLINE_CLIENTS_QUEUE_KEY = 'lakouwon_offline_clients_queue_v1';
+function loadOfflineClientsQueue(){
+  try{ return JSON.parse(localStorage.getItem(OFFLINE_CLIENTS_QUEUE_KEY) || '[]'); }catch(e){ return []; }
+}
+function saveOfflineClientsQueue(queue){
+  try{ localStorage.setItem(OFFLINE_CLIENTS_QUEUE_KEY, JSON.stringify(queue)); }catch(e){}
+}
+function queueOfflineClient(tempId, params){
+  const queue = loadOfflineClientsQueue();
+  queue.push({ tempId, params, queuedAt: Date.now() });
+  saveOfflineClientsQueue(queue);
+  persistOfflineCache();
+}
+
+async function syncOfflineClientsQueue(){
+  const queue = loadOfflineClientsQueue();
+  if(queue.length===0) return;
+  const remaining = [];
+  let synced = 0, failed = 0;
+  for(const item of queue){
+    const result = await supabase.from('clients').insert(item.params).select().single();
+    if(result.error){
+      if(isNetworkError(result.error)){ remaining.push(item); continue; }
+      remaining.push({...item, failed:true, errorMessage: friendlyError(result.error)});
+      failed++;
+      continue;
+    }
+    removeRow('clients', item.tempId);
+    upsertRow('clients', result.data);
+    synced++;
+  }
+  saveOfflineClientsQueue(remaining);
+  if(synced>0) showToast(`${synced} client(s) hors-ligne synchronisé(s) avec succès.`);
+  if(failed>0) showToast(`⚠ ${failed} client(s) hors-ligne n'ont pas pu être synchronisés (voir Paramètres).`);
+  persistOfflineCache();
+  render();
+}
+
 function setupConnectivityListeners(){
   window.addEventListener('offline', ()=>{ offlineMode = true; render(); });
   window.addEventListener('online', async ()=>{
@@ -468,6 +506,7 @@ function setupConnectivityListeners(){
     if(!loginState.loggedIn) return;
     try{ await loadAllData(); subscribeRealtime(); }catch(e){ /* on retentera au prochain événement online */ }
     await syncOfflineQueue();
+    await syncOfflineClientsQueue();
   });
 }
 
@@ -973,6 +1012,7 @@ function ctx(){
     upsertRow, removeRow, mapRow,
     get offlineMode(){return offlineMode;},
     isNetworkError, queueOfflineSale, loadOfflineQueue, saveOfflineQueue, persistOfflineCache, syncOfflineQueue,
+    queueOfflineClient, loadOfflineClientsQueue, syncOfflineClientsQueue,
     withBusyButton, exportCSV,
     get mobileSidebarOpen(){return mobileSidebarOpen;}, set mobileSidebarOpen(v){mobileSidebarOpen=v;},
     get installPromptEvent(){return installPromptEvent;}, isAppInstalled, promptInstall,

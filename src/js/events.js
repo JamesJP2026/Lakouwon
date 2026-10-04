@@ -518,6 +518,7 @@ export function attachAllEvents(ctx){
   if(btnRetryOfflineSync) btnRetryOfflineSync.onclick = async ()=>{
     if(!navigator.onLine){ ctx.showToast('Toujours hors-ligne — réessayez une fois la connexion internet rétablie.'); return; }
     await ctx.syncOfflineQueue();
+    await ctx.syncOfflineClientsQueue();
   };
 
   async function saveTheme(navy, gold){
@@ -807,8 +808,22 @@ export function attachAllEvents(ctx){
       Object.assign(state.clients.find(x=>x.id===ctx.editing.id), {nom, telephone});
       ctx.logAction('Client modifié', nom);
     } else {
+      if(!navigator.onLine){
+        registerOfflineClient(ctx, nom, telephone);
+        ctx.editing=null; ctx.render();
+        ctx.showToast("Pas de connexion — client enregistré hors-ligne, il sera synchronisé automatiquement au retour d'internet.");
+        return;
+      }
       const { data, error } = await supabase.from('clients').insert({ magasin_id: state.currentMagasinId, nom, telephone }).select().single();
-      if(error){ ctx.showToast(ctx.friendlyError(error)); return; }
+      if(error){
+        if(ctx.isNetworkError(error)){
+          registerOfflineClient(ctx, nom, telephone);
+          ctx.editing=null; ctx.render();
+          ctx.showToast("Pas de connexion — client enregistré hors-ligne, il sera synchronisé automatiquement au retour d'internet.");
+          return;
+        }
+        ctx.showToast(ctx.friendlyError(error)); return;
+      }
       ctx.upsertRow('clients', data);
       ctx.logAction('Client ajouté', nom);
     }
@@ -1064,6 +1079,17 @@ async function finalizeSale(ctx, montantRecuConfirme){
   ctx.cart = []; ctx.posPayMode='cash'; ctx.posClientId=''; ctx.posDepositMode='cash'; ctx.posMontantRecu=0; ctx.posRemiseType='montant'; ctx.posRemiseValeur=0;
   ctx.showToast('Vente enregistrée avec succès');
   ctx.printReceipt(vente);
+}
+
+// Construit un client "local" optimiste pendant une coupure internet, et le
+// place dans sa propre file d'attente pour un envoi automatique dès que la
+// connexion revient (voir syncOfflineClientsQueue dans app.js).
+function registerOfflineClient(ctx, nom, telephone){
+  const tempId = 'offline-' + ctx.uid();
+  const clientLocal = { id: tempId, magasinId: ctx.state.currentMagasinId, nom, telephone, pendingSync: true };
+  ctx.state.clients.push(clientLocal);
+  ctx.queueOfflineClient(tempId, { magasin_id: ctx.state.currentMagasinId, nom, telephone });
+  return clientLocal;
 }
 
 // Construit une vente "locale" optimiste pendant une coupure internet, et la

@@ -548,7 +548,7 @@ export function renderClients(ctx){
         <div style="display:flex; align-items:center; gap:12px;">
           <div class="cc-avatar">${initiale}</div>
           <div>
-            <div class="cc-name">${c.nom}</div>
+            <div class="cc-name">${c.nom}${c.pendingSync? ' <span class="tag low" title="Créé hors-ligne, en attente d\'envoi au serveur">⏳ hors-ligne</span>' : ''}</div>
             <div class="cc-phone muted">${c.telephone||'Pas de téléphone'}</div>
           </div>
         </div>
@@ -558,9 +558,8 @@ export function renderClients(ctx){
         </div>
         <div class="cc-debt ${dette>0?'debt-pos':''}">${dette>0? '⚠ Dette : '+money(dette) : '✓ Aucune dette'}</div>
         <div class="cc-actions">
-          ${dette>0?`<button class="btn btn-sm btn-gold" data-pay-dette="${c.id}">Paiement</button>`:''}
-          <button class="btn btn-sm" data-edit-client="${c.id}">Modifier</button>
-          <button class="btn btn-sm btn-danger" data-del-client="${c.id}">Suppr.</button>
+          ${!c.pendingSync && dette>0?`<button class="btn btn-sm btn-gold" data-pay-dette="${c.id}">Paiement</button>`:''}
+          ${!c.pendingSync? `<button class="btn btn-sm" data-edit-client="${c.id}">Modifier</button><button class="btn btn-sm btn-danger" data-del-client="${c.id}">Suppr.</button>` : ''}
         </div>
       </div>`;
     }).join('') : `<div class="empty" style="grid-column:1/-1;">Aucun client pour ce magasin.</div>`}
@@ -964,14 +963,18 @@ export function renderParametres(ctx){
   const { state } = ctx;
   const s = state.settings;
   const queue = ctx.loadOfflineQueue();
+  const clientsQueue = ctx.loadOfflineClientsQueue();
   return `
   <div class="topbar"><div><h1>Paramètres</h1><p>Personnalisez votre système</p></div></div>
 
-  ${queue.length? `<div class="panel" style="max-width:560px;">
-    <h3>Ventes hors-ligne en attente</h3>
-    <p class="muted" style="margin-top:-6px; font-size:12.5px;">Ventes faites pendant une coupure internet, pas encore confirmées par le serveur.</p>
+  ${queue.length || clientsQueue.length? `<div class="panel" style="max-width:560px;">
+    <h3>Données hors-ligne en attente</h3>
+    <p class="muted" style="margin-top:-6px; font-size:12.5px;">Ventes et clients enregistrés pendant une coupure internet, pas encore confirmés par le serveur.</p>
     ${queue.map(item=>`<div class="alert-item">
-      <span>${item.failed? `⚠ Échec — ${item.errorMessage||'erreur inconnue'}` : '⏳ En attente d\'envoi'}</span>
+      <span>Vente — ${item.failed? `⚠ Échec — ${item.errorMessage||'erreur inconnue'}` : '⏳ En attente d\'envoi'}</span>
+    </div>`).join('')}
+    ${clientsQueue.map(item=>`<div class="alert-item">
+      <span>Client ${item.params?.nom||''} — ${item.failed? `⚠ Échec — ${item.errorMessage||'erreur inconnue'}` : '⏳ En attente d\'envoi'}</span>
     </div>`).join('')}
     <button class="btn btn-primary" id="btn-retry-offline-sync" style="margin-top:10px;">🔄 Réessayer maintenant</button>
   </div>` : ''}
