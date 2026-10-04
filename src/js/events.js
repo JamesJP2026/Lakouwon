@@ -833,7 +833,9 @@ export function attachAllEvents(ctx){
     if(!ctx.isAdminConnecte()){ ctx.showToast('Seul un administrateur peut gérer les mots de passe'); return; }
     const emailVal = document.getElementById('f-email').value.trim();
     if(!emailVal){ ctx.showToast("Renseignez d'abord l'email de l'agent"); return; }
-    const { data, error } = await supabase.functions.invoke('admin-employee', { body:{ action:'set_password', employe_id: ctx.editing.id, email: emailVal } });
+    const customPw = (document.getElementById('f-password-custom').value||'').trim();
+    if(customPw && customPw.length<6){ ctx.showToast('Le mot de passe doit contenir au moins 6 caractères'); return; }
+    const { data, error } = await supabase.functions.invoke('admin-employee', { body:{ action:'set_password', employe_id: ctx.editing.id, email: emailVal, ...(customPw? {password: customPw} : {}) } });
     if(error || data?.error){ alert(data?.error || await ctx.edgeFunctionErrorMessage(error)); return; }
     ctx.generatedPasswordPreview = data.password;
     const emp = state.employes.find(x=>x.id===ctx.editing.id);

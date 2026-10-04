@@ -114,8 +114,11 @@ Deno.serve(async (req) => {
   // clair une seule fois (comme dans l'app d'origine).
   // -------------------------------------------------------
   if (action === "set_password") {
-    const { employe_id, email } = payload as { employe_id?: string; email?: string };
+    const { employe_id, email, password: customPassword } = payload as { employe_id?: string; email?: string; password?: string };
     if (!employe_id || !email) return json({ error: "employe_id et email sont requis" }, 400);
+    if (customPassword && customPassword.length < 6) {
+      return json({ error: "Le mot de passe doit contenir au moins 6 caractères" }, 400);
+    }
 
     const { data: target, error: targetErr } = await admin
       .from("employes")
@@ -125,7 +128,7 @@ Deno.serve(async (req) => {
     if (targetErr) return json({ error: targetErr.message }, 500);
     if (!target) return json({ error: "Employé introuvable" }, 404);
 
-    const password = generatePassword(10);
+    const password = customPassword || generatePassword(10);
     const normalizedEmail = String(email).toLowerCase();
 
     if (target.auth_user_id) {
@@ -155,7 +158,7 @@ Deno.serve(async (req) => {
     }
 
     await admin.from("journal").insert({
-      action: "Mot de passe généré",
+      action: customPassword ? "Mot de passe défini" : "Mot de passe généré",
       details: target.nom,
       employe_id: callerEmploye.id,
     });

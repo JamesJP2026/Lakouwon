@@ -1361,8 +1361,11 @@ function modalEmploye(ctx){
         ${!ctx.isAdminConnecte() ? `<span class="muted">Seul un administrateur peut générer ou modifier les mots de passe.</span>` :
           ctx.editing.id ? `
           ${e.authUserId ? 'Un compte de connexion est déjà configuré pour cet agent.' : "Aucun compte de connexion — l'agent ne peut pas encore se connecter."}
-          <div style="margin-top:8px;"><button type="button" class="btn btn-sm btn-gold" id="btn-generate-password">${e.authUserId?'↻ Régénérer un mot de passe':'🔑 Générer un mot de passe'}</button></div>
-          ${ctx.generatedPasswordPreview? `<div style="margin-top:10px; background:var(--green-bg); color:var(--green); padding:8px 10px; border-radius:6px; font-weight:700;">Mot de passe généré : ${ctx.generatedPasswordPreview}<br><span style="font-weight:500; font-size:11px;">Notez-le maintenant et communiquez-le à l'agent — il ne sera plus jamais réaffiché.</span></div>` : ''}
+          <div class="field" style="margin-top:8px; margin-bottom:6px;"><label>Mot de passe précis (optionnel)</label>
+            <input type="text" id="f-password-custom" placeholder="Laisser vide pour générer un mot de passe automatiquement" minlength="6">
+          </div>
+          <div><button type="button" class="btn btn-sm btn-gold" id="btn-generate-password">${e.authUserId?'↻ Changer le mot de passe':'🔑 Définir le mot de passe'}</button></div>
+          ${ctx.generatedPasswordPreview? `<div style="margin-top:10px; background:var(--green-bg); color:var(--green); padding:8px 10px; border-radius:6px; font-weight:700;">Mot de passe : ${ctx.generatedPasswordPreview}<br><span style="font-weight:500; font-size:11px;">Notez-le maintenant et communiquez-le à l'agent — il ne sera plus jamais réaffiché.</span></div>` : ''}
         ` : `<span class="muted">Enregistrez d'abord l'employé, puis rouvrez sa fiche pour générer son mot de passe.</span>`}
       </div>
     </div>
