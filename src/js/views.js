@@ -138,7 +138,7 @@ export function renderVente(ctx){
           const lots = p.lots||[];
           return `<div class="prod-card ${dispo<=0?'out':''}" data-name="${p.nom.toLowerCase()}">
             <div class="pn">${p.nom}</div>
-            <div class="pp">${money(p.prixVenteDetail)} <span class="muted" style="font-weight:500;font-size:11px;">/ unité</span></div>
+            <div class="pp">${money(ctx.prixDetailEffectif(p))} <span class="muted" style="font-weight:500;font-size:11px;">/ unité</span></div>
             <div class="pq">${dispo<=0? '<span style="color:var(--red);font-weight:700;">Rupture de stock</span>' : (dispo!==stock? `Disponible: ${dispo} (sur ${stock})` : `Stock: ${stock} unité(s)`)}</div>
             <button class="btn btn-sm btn-primary" data-add-detail="${p.id}" ${dispo<=0?'disabled':''} style="width:100%; margin-top:7px;">+ Détail</button>
             ${lots.length? `<select data-lot-add="${p.id}" ${dispo<=0?'disabled':''} style="width:100%; margin-top:5px; padding:6px; border:1px solid var(--line); border-radius:6px; font-size:12px;">
@@ -1103,7 +1103,7 @@ function renderProformaBuilder(ctx){
           const lots = p.lots||[];
           return `<div class="prod-card">
             <div class="pn">${p.nom}</div>
-            <div class="pp">${money(p.prixVenteDetail)} <span class="muted" style="font-weight:500;font-size:11px;">/ unité</span></div>
+            <div class="pp">${money(ctx.prixDetailEffectif(p))} <span class="muted" style="font-weight:500;font-size:11px;">/ unité</span></div>
             <button class="btn btn-sm btn-primary" data-pf-add-detail="${p.id}" style="width:100%; margin-top:7px;">+ Détail</button>
             ${lots.length? `<select data-pf-lot-add="${p.id}" style="width:100%; margin-top:5px; padding:6px; border:1px solid var(--line); border-radius:6px; font-size:12px;">
               <option value="">+ Ajouter un lot...</option>

@@ -616,7 +616,7 @@ export function attachAllEvents(ctx){
   document.querySelectorAll('[data-pf-add-detail]').forEach(b=>b.onclick = ()=>{
     const p = state.produits.find(x=>x.id===b.dataset.pfAddDetail);
     const existing = ctx.proformaCart.find(i=>i.produitId===p.id && i.mode==='detail');
-    if(existing) existing.qte++; else ctx.proformaCart.push({produitId:p.id, nom:p.nom, mode:'detail', qte:1, prixVente:p.prixVenteDetail, coutUnitaire:ctx.coutUnitaire(p), uniteParLot:1});
+    if(existing) existing.qte++; else ctx.proformaCart.push({produitId:p.id, nom:p.nom, mode:'detail', qte:1, prixVente:ctx.prixDetailEffectif(p), coutUnitaire:ctx.coutUnitaire(p), uniteParLot:1});
     ctx.render();
   });
   document.querySelectorAll('[data-pf-lot-add]').forEach(sel=>sel.onchange = ()=>{
@@ -993,7 +993,7 @@ function addToCart(ctx, prodId){
   if(dejaUnites + 1 > stock){ ctx.showToast('Stock insuffisant'); return; }
   const existing = ctx.cart.find(i=>i.produitId===prodId && i.mode==='detail');
   if(existing){ existing.qte += 1; }
-  else{ ctx.cart.push({produitId:p.id, nom:p.nom, mode:'detail', qte:1, prixVente:p.prixVenteDetail, coutUnitaire:ctx.coutUnitaire(p), uniteParLot:1}); }
+  else{ ctx.cart.push({produitId:p.id, nom:p.nom, mode:'detail', qte:1, prixVente:ctx.prixDetailEffectif(p), coutUnitaire:ctx.coutUnitaire(p), uniteParLot:1}); }
   ctx.render();
 }
 function addLotToCart(ctx, prodId, lotId){

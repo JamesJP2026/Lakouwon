@@ -61,6 +61,13 @@ async function withBusyButton(btn, fn){
 
 function coutUnitaire(p){ const qpc = p.quantiteParCaisse>0? p.quantiteParCaisse : 1; return (p.prixAchat||0)/qpc; }
 function stockUnites(p){ return (p.quantiteCaisse||0)*(p.quantiteParCaisse||1) + (p.quantiteDetail||0); }
+// Si aucun prix au détail n'est configuré pour ce produit, on se base sur le
+// prix de la caisse (gros) ramené à l'unité plutôt que de facturer 0.
+function prixDetailEffectif(p){
+  if(p.prixVenteDetail) return p.prixVenteDetail;
+  const lotCaisse = (p.lots||[]).find(l=>l.taille===(p.quantiteParCaisse||1));
+  return lotCaisse ? lotCaisse.prix / (p.quantiteParCaisse||1) : 0;
+}
 function margePct(prixVente, cout){ return cout>0 ? ((prixVente-cout)/cout*100) : 0; }
 
 function periodBounds(p){
@@ -960,7 +967,7 @@ function ctx(){
     magasinProduits, magasinProduitsActifs, magasinClients, magasinVentes, magasinCaisse, magasinEmployes,
     magasinProformas, magasinAchats, ventesPeriode, clientDette, totalDettesMagasin, valeurStock, soldeCaisse,
     isDepense, kpisPeriode, joursDepuisDerniereVente,
-    coutUnitaire, stockUnites, margePct, unitsConsumed, cartTotal, cartCost, remiseMontant, venteTotalNet, remiseSummaryHTML,
+    coutUnitaire, stockUnites, prixDetailEffectif, margePct, unitsConsumed, cartTotal, cartCost, remiseMontant, venteTotalNet, remiseSummaryHTML,
     fmt, money, nowStr, uid, applyTheme, shadeColor, THEME_PRESETS, PERMS_ALL, PERMS_LABELS, PERMS_PRESETS,
     SEUIL_ARCHIVAGE_JOURS, periodBounds, printReceipt, printProforma, doLogout,
     upsertRow, removeRow, mapRow,
